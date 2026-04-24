@@ -2,6 +2,7 @@ import process from 'node:process';
 
 import meow from 'meow';
 
+import { detectColumns } from './core/columns.js';
 import { NoTextLayerError, PdfLoadError } from './core/errors.js';
 import { openPdf } from './core/pdf-service.js';
 
@@ -28,7 +29,11 @@ if (!filePath) {
 try {
   const document = await openPdf(filePath);
   const output = document.pages
-    .map((page) => page.map((item) => item.str).join(' '))
+    .map((page) =>
+      detectColumns(page)
+        .orderedItems.map((item) => item.str)
+        .join(' '),
+    )
     .join('\n\n');
 
   process.stdout.write(`${output}\n`);
