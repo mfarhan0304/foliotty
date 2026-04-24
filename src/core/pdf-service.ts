@@ -5,7 +5,11 @@ import { join } from 'node:path';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 
-import { VerbosityLevel, getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
+import {
+  AnnotationType,
+  VerbosityLevel,
+  getDocument,
+} from 'pdfjs-dist/legacy/build/pdf.mjs';
 import type {
   PDFDocumentProxy,
   TextContent,
@@ -24,9 +28,19 @@ export type TextItem = {
   fontSize: number;
 };
 
+export type PdfLink = {
+  text: string;
+  url: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
 export type PdfTextDocument = {
   numPages: number;
   pages: TextItem[][];
+  pageLinks: PdfLink[][];
 };
 
 const pdfJsPackageRoot = dirname(
@@ -73,6 +87,55 @@ async function extractPageText(
   return textContent.items.filter(isPdfJsTextItem).map(toTextItem);
 }
 
+async function extractPageLinks(
+  document: PDFDocumentProxy,
+  pageNumber: number,
+): Promise<PdfLink[]> {
+  const page = await document.getPage(pageNumber);
+  const annotations = await page.getAnnotations();
+
+  return annotations
+    .filter((annotation) => annotation.annotationType === AnnotationType.LINK)
+    .flatMap((annotation) => {
+      const url =
+        typeof annotation.url === 'string'
+          ? annotation.url
+          : typeof annotation.unsafeUrl === 'string'
+            ? annotation.unsafeUrl
+            : null;
+
+      if (url === null) {
+        return [];
+      }
+
+      const rect = Array.isArray(annotation.rect) ? annotation.rect : [];
+      const [left = 0, bottom = 0, right = 0, top = 0] = rect;
+      const text =
+        typeof annotation.overlaidText === 'string' &&
+        annotation.overlaidText.trim().length > 0
+          ? annotation.overlaidText.trim()
+          : url;
+
+      return [
+        {
+          text,
+          url,
+          x: left,
+          y: top,
+          width: Math.max(0, right - left),
+          height: Math.max(0, top - bottom),
+        },
+      ];
+    })
+    .sort((left, right) => {
+      if (left.y !== right.y) {
+        return right.y - left.y;
+      }
+
+      return left.x - right.x;
+    });
+}
+
 export async function openPdf(filePath: string): Promise<PdfTextDocument> {
   const fileBuffer = await readFile(filePath);
   const data = new Uint8Array(
@@ -96,9 +159,11 @@ export async function openPdf(filePath: string): Promise<PdfTextDocument> {
     document = await loadingTask.promise;
 
     const pages: TextItem[][] = [];
+    const pageLinks: PdfLink[][] = [];
 
     for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
       pages.push(await extractPageText(document, pageNumber));
+      pageLinks.push(await extractPageLinks(document, pageNumber));
     }
 
     const hasText = pages.some((items) =>
@@ -112,6 +177,7 @@ export async function openPdf(filePath: string): Promise<PdfTextDocument> {
     return {
       numPages: document.numPages,
       pages,
+      pageLinks,
     };
   } catch (error) {
     if (error instanceof NoTextLayerError) {

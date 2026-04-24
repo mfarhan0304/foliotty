@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, describe, test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import { NoTextLayerError } from '../errors.js';
 import { openPdf } from '../pdf-service.js';
@@ -104,5 +105,20 @@ describe('openPdf', () => {
     await writeFile(filePath, createBlankPdf());
 
     await assert.rejects(() => openPdf(filePath), NoTextLayerError);
+  });
+
+  test('extracts hyperlink annotations when they exist', async () => {
+    const fixturePath = fileURLToPath(
+      new URL('../../../samples/word.pdf', import.meta.url),
+    );
+
+    const document = await openPdf(fixturePath);
+    const firstLink = document.pageLinks[0]?.[0];
+
+    assert.ok((document.pageLinks[0]?.length ?? 0) > 0);
+    assert.equal(firstLink?.text, 'm.farhan@nyu.edu');
+    assert.equal(firstLink?.url, 'mailto:m.farhan@nyu.edu');
+    assert.equal(typeof firstLink?.x, 'number');
+    assert.equal(typeof firstLink?.y, 'number');
   });
 });
