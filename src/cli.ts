@@ -1,55 +1,18 @@
 import process from 'node:process';
+import { basename } from 'node:path';
 
 import chalk from 'chalk';
+import { render } from 'ink';
 import meow from 'meow';
+import React from 'react';
 
 import { detectColumns } from './core/columns.js';
 import { NoTextLayerError, PdfLoadError } from './core/errors.js';
 import { openPdf } from './core/pdf-service.js';
 import type { PdfLink } from './core/pdf-service.js';
 import { buildStyledLines } from './core/structure.js';
-
-function renderStyledText(
-  text: string,
-  options: { bold: boolean; italic: boolean },
-): string {
-  let styled = text;
-
-  if (options.bold) {
-    styled = chalk.bold(styled);
-  }
-
-  if (options.italic) {
-    styled = chalk.italic(styled);
-  }
-
-  return styled;
-}
-
-function renderLine(line: ReturnType<typeof buildStyledLines>[number]): string {
-  if (line.kind === 'blank') {
-    return '';
-  }
-
-  const content = line.runs
-    .map((run) =>
-      renderStyledText(run.text, {
-        bold: run.bold,
-        italic: run.italic,
-      }),
-    )
-    .join('');
-
-  if (line.kind === 'h1') {
-    return chalk.bold.cyan.underline(content);
-  }
-
-  if (line.kind === 'h2') {
-    return chalk.bold.yellow(content);
-  }
-
-  return content;
-}
+import { App } from './tui/App.js';
+import { renderStyledLine } from './tui/render.js';
 
 function renderLinks(links: PdfLink[]): string {
   if (links.length === 0) {
@@ -84,18 +47,27 @@ if (!filePath) {
 
 try {
   const document = await openPdf(filePath);
-  const output = document.pages
-    .map((page, index) => {
-      const content = buildStyledLines(detectColumns(page))
-        .map(renderLine)
-        .join('\n');
-      const links = renderLinks(document.pageLinks[index] ?? []);
+  const pages = document.pages.map((page, index) => ({
+    lines: buildStyledLines(detectColumns(page)),
+    links: document.pageLinks[index] ?? [],
+  }));
 
-      return links.length > 0 ? `${content}\n\n${links}` : content;
-    })
-    .join('\n\n');
+  if (process.stdout.isTTY && process.stdin.isTTY) {
+    render(React.createElement(App, { filename: basename(filePath), pages }));
+  } else {
+    const output = pages
+      .map((page) => {
+        const content = page.lines
+          .map((line) => renderStyledLine(line))
+          .join('\n');
+        const links = renderLinks(page.links);
 
-  process.stdout.write(`${output}\n`);
+        return links.length > 0 ? `${content}\n\n${links}` : content;
+      })
+      .join('\n\n');
+
+    process.stdout.write(`${output}\n`);
+  }
 } catch (error) {
   if (error instanceof NoTextLayerError) {
     process.stderr.write(
