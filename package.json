@@ -1,0 +1,36 @@
+{
+  "name": "foliotty",
+  "version": "0.1.0",
+  "description": "Read PDF resumes in the terminal",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": {
+    "foliotty": "./bin/foliotty.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "bin",
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "compare:samples": "bun run scripts/compare-samples.ts",
+    "dev": "bun run src/cli.ts",
+    "lint": "prettier --check . && tsc --noEmit",
+    "format": "prettier --write .",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "chalk": "5.3.0",
+    "meow": "^14.0.0",
+    "pdfjs-dist": "^5.4.149"
+  },
+  "devDependencies": {
+    "@types/node": "^24.6.0",
+    "prettier": "^3.6.2",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.3"
+  }
+}
