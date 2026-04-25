@@ -157,6 +157,10 @@ export function App({
   const currentHitLineIndex = currentHit?.lineIndex ?? null;
   const currentPage = displayPages[currentPageIndex] ?? { lines: [] };
   const currentPageLinks = pages[currentPageIndex]?.links ?? [];
+  const currentPreviewPages = previewPages.slice(
+    currentPageIndex,
+    currentPageIndex + 2,
+  );
   const currentPageStart = pageStarts[currentPageIndex] ?? 0;
   const currentPageScrollOffset = pageScrollOffsets[currentPageIndex] ?? 0;
   const currentPageNumber = currentPageIndex + 1;
@@ -484,7 +488,7 @@ export function App({
         ) : displayMode === 'preview' ? (
           <PreviewView
             capability={graphicsCapability}
-            page={previewPages[currentPageIndex]}
+            pages={currentPreviewPages}
           />
         ) : (
           <ResumeView

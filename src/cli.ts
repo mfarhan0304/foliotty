@@ -61,15 +61,14 @@ try {
 
   if (process.stdout.isTTY && process.stdin.isTTY) {
     const graphicsCapability = detectGraphicsCapability();
+    const previewHeight = Math.max(240, ((process.stdout.rows ?? 24) - 4) * 18);
+    const previewPageWidth = Math.floor((previewHeight * 8.5) / 11);
     const previewPages = supportsInlinePreview(graphicsCapability)
       ? await Promise.all(
           Array.from({ length: document.numPages }, (_, index) =>
             renderPdfPageToPng(filePath, {
               pageNumber: index + 1,
-              width: Math.max(
-                320,
-                Math.min(1000, (process.stdout.columns ?? 80) * 8),
-              ),
+              width: previewPageWidth,
             }),
           ),
         ).catch((error: unknown) => {

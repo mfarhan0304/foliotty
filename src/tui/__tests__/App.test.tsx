@@ -93,6 +93,32 @@ describe('App', () => {
     assert.doesNotMatch(frame, /Text Mode/);
   });
 
+  test('keeps two-page preview spread on the current page pair', async () => {
+    const result = render(
+      <App
+        filename="resume.pdf"
+        graphicsCapability="kitty"
+        pages={[
+          { lines: [createLine('Page One')], links: [] },
+          { lines: [createLine('Page Two')], links: [] },
+          { lines: [createLine('Page Three')], links: [] },
+        ]}
+        previewPages={[
+          { ...createRasterPage(), pageNumber: 1 },
+          { ...createRasterPage(), pageNumber: 2 },
+          { ...createRasterPage(), pageNumber: 3 },
+        ]}
+      />,
+    );
+
+    assert.match(result.lastFrame() ?? '', /page 1\/3/);
+
+    result.stdin.write('K');
+    await tick(20);
+
+    assert.match(result.lastFrame() ?? '', /page 2\/3/);
+  });
+
   test('toggles from preview mode to text mode', async () => {
     const result = render(
       <App

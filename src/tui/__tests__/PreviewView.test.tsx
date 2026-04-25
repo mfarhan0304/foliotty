@@ -7,11 +7,11 @@ import {
 } from '../PreviewView.js';
 import type { RasterPage } from '../../core/raster.js';
 
-function createRasterPage(): RasterPage {
+function createRasterPage(content = 'png'): RasterPage {
   return {
     height: 1,
     pageNumber: 1,
-    png: Buffer.from('png'),
+    png: Buffer.from(content),
     width: 1,
   };
 }
@@ -45,5 +45,14 @@ describe('renderInlinePreviewImage', () => {
 
   test('returns null when direct PNG preview is unsupported', () => {
     assert.equal(renderInlinePreviewImage(createRasterPage(), 'sixel'), null);
+  });
+
+  test('can render adjacent page images as separate escape sequences', () => {
+    assert.deepEqual(
+      [createRasterPage('one'), createRasterPage('two')].map((page) =>
+        renderInlinePreviewImage(page, 'kitty'),
+      ),
+      ['\u001B_Ga=T,f=100;b25l\u001B\\', '\u001B_Ga=T,f=100;dHdv\u001B\\'],
+    );
   });
 });

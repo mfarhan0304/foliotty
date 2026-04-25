@@ -6,7 +6,7 @@ import type { GraphicsCapability } from './graphics.js';
 
 type PreviewViewProps = {
   capability: GraphicsCapability;
-  page: RasterPage | undefined;
+  pages: RasterPage[];
 };
 
 export function supportsInlinePreview(
@@ -34,14 +34,20 @@ export function renderInlinePreviewImage(
 
 export function PreviewView({
   capability,
-  page,
+  pages,
 }: PreviewViewProps): React.JSX.Element {
-  const image = page ? renderInlinePreviewImage(page, capability) : null;
+  const images = pages
+    .map((page) => renderInlinePreviewImage(page, capability))
+    .filter((image): image is string => image !== null);
 
   return (
-    <Box flexDirection="column">
-      {image ? (
-        <Text>{image}</Text>
+    <Box flexDirection="row">
+      {images.length > 0 ? (
+        images.map((image, index) => (
+          <Box key={index} marginRight={index < images.length - 1 ? 1 : 0}>
+            <Text>{image}</Text>
+          </Box>
+        ))
       ) : (
         <Text dimColor>
           Raster preview is unavailable in this terminal. Press t for text mode.
