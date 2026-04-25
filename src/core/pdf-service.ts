@@ -7,11 +7,14 @@ import { pathToFileURL } from 'node:url';
 
 import {
   AnnotationType,
+  OPS,
   VerbosityLevel,
   getDocument,
 } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import type {
   PDFDocumentProxy,
+  PDFOperatorList,
+  PDFPageProxy,
   TextContent,
   TextItem as PdfJsTextItem,
 } from 'pdfjs-dist/types/src/display/api.js';
@@ -26,6 +29,7 @@ export type TextItem = {
   height: number;
   fontName: string;
   fontSize: number;
+  color?: string;
 };
 
 export type PdfLink = {
@@ -58,12 +62,12 @@ function isPdfJsTextItem(
   return 'str' in item;
 }
 
-function toTextItem(item: PdfJsTextItem): TextItem {
+function toTextItem(item: PdfJsTextItem, color: string | undefined): TextItem {
   const [scaleX = 0, skewX = 0, , scaleY = 0, x = 0, y = 0] = item.transform;
   const derivedFontSize = Math.hypot(scaleX, skewX);
   const fallbackFontSize = Math.abs(scaleY) || item.height;
 
-  return {
+  const textItem: TextItem = {
     str: item.str,
     x,
     y,
@@ -72,6 +76,68 @@ function toTextItem(item: PdfJsTextItem): TextItem {
     fontName: item.fontName,
     fontSize: derivedFontSize || fallbackFontSize,
   };
+
+  if (color !== undefined) {
+    textItem.color = color;
+  }
+
+  return textItem;
+}
+
+function firstHexColor(args: unknown): string | undefined {
+  if (!Array.isArray(args)) {
+    return undefined;
+  }
+
+  const [value] = args;
+
+  if (typeof value !== 'string' || !/^#[\da-f]{6}$/iu.test(value)) {
+    return undefined;
+  }
+
+  return value.toLowerCase();
+}
+
+function extractTextColors(
+  operatorList: PDFOperatorList,
+): Array<string | undefined> {
+  const colors: Array<string | undefined> = [];
+  const colorStack: Array<string | undefined> = [];
+  let fillColor: string | undefined;
+
+  for (const [index, fn] of operatorList.fnArray.entries()) {
+    if (fn === OPS.save) {
+      colorStack.push(fillColor);
+      continue;
+    }
+
+    if (fn === OPS.restore) {
+      fillColor = colorStack.pop();
+      continue;
+    }
+
+    if (
+      fn === OPS.setFillRGBColor ||
+      fn === OPS.setFillGray ||
+      fn === OPS.setFillCMYKColor ||
+      fn === OPS.setFillColor ||
+      fn === OPS.setFillColorN
+    ) {
+      fillColor = firstHexColor(operatorList.argsArray[index]);
+      continue;
+    }
+
+    if (
+      fn === OPS.showText ||
+      fn === OPS.showSpacedText ||
+      fn === OPS.nextLineShowText ||
+      fn === OPS.nextLineSetSpacingShowText
+    ) {
+      colors.push(fillColor);
+    }
+  }
+
+  return colors;
 }
 
 async function extractPageText(
@@ -83,8 +149,22 @@ async function extractPageText(
     disableNormalization: true,
     includeMarkedContent: false,
   });
+  const colors = await extractPageTextColors(page, textContent);
 
-  return textContent.items.filter(isPdfJsTextItem).map(toTextItem);
+  return textContent.items
+    .filter(isPdfJsTextItem)
+    .map((item, index) => toTextItem(item, colors[index]));
+}
+
+async function extractPageTextColors(
+  page: PDFPageProxy,
+  textContent: TextContent,
+): Promise<Array<string | undefined>> {
+  const textItems = textContent.items.filter(isPdfJsTextItem);
+  const operatorList = await page.getOperatorList();
+  const colors = extractTextColors(operatorList);
+
+  return colors.length === textItems.length ? colors : [];
 }
 
 async function extractPageLinks(

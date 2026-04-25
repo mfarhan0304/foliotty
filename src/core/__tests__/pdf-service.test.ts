@@ -55,6 +55,28 @@ function createTextPdf(lines: string[]): Uint8Array {
   ]);
 }
 
+function createColoredTextPdf(): Uint8Array {
+  const content = [
+    'BT',
+    '/F1 18 Tf',
+    '72 720 Td',
+    '1 0 0 rg',
+    '(Red) Tj',
+    '0 -24 Td',
+    '0 0 1 rg',
+    '(Blue) Tj',
+    'ET',
+  ].join('\n');
+
+  return createPdf([
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',
+    `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ]);
+}
+
 function createBlankPdf(): Uint8Array {
   const content = ['0.9 g', '0 0 612 792 re', 'f'].join('\n');
 
@@ -111,6 +133,23 @@ describe('openPdf', () => {
     await writeFile(filePath, createBlankPdf());
 
     await assert.rejects(() => openPdf(filePath), NoTextLayerError);
+  });
+
+  test('extracts text color metadata when operator order is unambiguous', async () => {
+    tempDirectory = await mkdtemp(join(tmpdir(), 'foliotty-'));
+    const filePath = join(tempDirectory, 'colored.pdf');
+    await writeFile(filePath, createColoredTextPdf());
+
+    const document = await openPdf(filePath);
+    const firstPage = document.pages[0];
+
+    assert.deepEqual(
+      firstPage?.map((item) => [item.str, item.color]),
+      [
+        ['Red', '#ff0000'],
+        ['Blue', '#0000ff'],
+      ],
+    );
   });
 
   test('extracts hyperlink annotations when they exist', async () => {
