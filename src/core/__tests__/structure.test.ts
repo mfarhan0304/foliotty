@@ -200,4 +200,32 @@ describe('buildStyledLines', () => {
       ],
     );
   });
+
+  test('keeps table captions attached to aligned table blocks', () => {
+    const lines = buildStyledLines(
+      createLayout([
+        createItem('TABLE I.', { width: 42, x: 72, y: 720 }),
+        createItem('MODEL RESULTS', { width: 80, x: 160, y: 720 }),
+        createItem('Metric', { width: 40, x: 72, y: 700 }),
+        createItem('Value', { width: 40, x: 180, y: 700 }),
+        createItem('AUC', { width: 24, x: 72, y: 684 }),
+        createItem('0.91', { width: 24, x: 180, y: 684 }),
+        createItem('F1', { width: 16, x: 72, y: 668 }),
+        createItem('0.84', { width: 24, x: 180, y: 668 }),
+      ]),
+    );
+
+    assert.deepEqual(
+      lines.map((line) => line.text),
+      [
+        'TABLE I. MODEL RESULTS',
+        '+--------+-------+',
+        '| Metric | Value |',
+        '+--------+-------+',
+        '| AUC    | 0.91  |',
+        '| F1     | 0.84  |',
+        '+--------+-------+',
+      ],
+    );
+  });
 });

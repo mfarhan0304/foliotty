@@ -263,6 +263,34 @@ function makeRuns(items: TextItem[], bullet: boolean): StyledRun[] {
   return runs;
 }
 
+function makePlainRuns(items: TextItem[]): StyledRun[] {
+  const runs: StyledRun[] = [];
+  let previousContentItem: TextItem | undefined;
+
+  for (const item of items) {
+    const text = cleanText(item.str);
+
+    if (text.length === 0) {
+      continue;
+    }
+
+    const prefix =
+      previousContentItem === undefined
+        ? ''
+        : spacingBetween(previousContentItem, item, false);
+
+    runs.push({
+      bold: isBoldFont(item.fontName),
+      italic: isItalicFont(item.fontName),
+      text: `${prefix}${text}`,
+    });
+
+    previousContentItem = item;
+  }
+
+  return runs;
+}
+
 function plainStyledLine(text: string): StyledLine {
   return {
     kind: 'body',
@@ -273,6 +301,16 @@ function plainStyledLine(text: string): StyledLine {
 
 function isTableCandidate(line: LineGroup): boolean {
   return line.items.length >= 2 && hasTableColumnGap(line.items);
+}
+
+function lineText(line: LineGroup): string {
+  return makePlainRuns(line.items)
+    .map((run) => run.text)
+    .join('');
+}
+
+function isTableCaption(line: LineGroup): boolean {
+  return /^table\s+(?:[ivxlcdm]+|\d+)\b[.:]?/iu.test(lineText(line));
 }
 
 function detectTableAt(
@@ -320,6 +358,42 @@ function detectTableAt(
   };
 }
 
+function renderLine(
+  line: LineGroup,
+  thresholds: { bodyFontSize: number; h1FontSize: number; h2FontSize: number },
+): StyledLine | null {
+  const bullet = line.items.some(
+    (item, index) => index === 0 && isBulletMarker(item.str),
+  );
+  const runs = makeRuns(line.items, bullet);
+  const text = runs.map((run) => run.text).join('');
+
+  if (text.trim().length === 0) {
+    return null;
+  }
+
+  return {
+    kind: lineKind(line, thresholds, bullet),
+    runs,
+    text,
+  };
+}
+
+function renderCaption(line: LineGroup): StyledLine | null {
+  const runs = makePlainRuns(line.items);
+  const text = runs.map((run) => run.text).join('');
+
+  if (text.trim().length === 0) {
+    return null;
+  }
+
+  return {
+    kind: 'body',
+    runs,
+    text,
+  };
+}
+
 export function buildStyledLines(layout: ColumnLayout): StyledLine[] {
   const lines = groupItemsIntoLines(layout.orderedItems);
   const thresholds = headingThreshold(lines);
@@ -334,6 +408,38 @@ export function buildStyledLines(layout: ColumnLayout): StyledLine[] {
     const line = lines[index];
 
     if (line === undefined) {
+      continue;
+    }
+
+    if (isTableCaption(line)) {
+      const followingTable = detectTableAt(lines, index + 1);
+
+      if (
+        previousLine &&
+        previousLine.y > line.y &&
+        previousLine.y - line.y > medianLineHeight * 1.5
+      ) {
+        result.push({
+          kind: 'blank',
+          runs: [],
+          text: '',
+        });
+      }
+
+      const caption = renderCaption(line);
+
+      if (caption !== null) {
+        result.push(caption);
+      }
+
+      if (followingTable !== null) {
+        result.push(...followingTable.renderedLines);
+        previousLine = followingTable.lastLine;
+        index = followingTable.endIndex;
+        continue;
+      }
+
+      previousLine = line;
       continue;
     }
 
@@ -358,16 +464,6 @@ export function buildStyledLines(layout: ColumnLayout): StyledLine[] {
       continue;
     }
 
-    const bullet = line.items.some(
-      (item, index) => index === 0 && isBulletMarker(item.str),
-    );
-    const runs = makeRuns(line.items, bullet);
-    const text = runs.map((run) => run.text).join('');
-
-    if (text.trim().length === 0) {
-      continue;
-    }
-
     if (
       previousLine &&
       previousLine.y > line.y &&
@@ -380,11 +476,11 @@ export function buildStyledLines(layout: ColumnLayout): StyledLine[] {
       });
     }
 
-    result.push({
-      kind: lineKind(line, thresholds, bullet),
-      runs,
-      text,
-    });
+    const styledLine = renderLine(line, thresholds);
+
+    if (styledLine !== null) {
+      result.push(styledLine);
+    }
 
     previousLine = line;
   }
