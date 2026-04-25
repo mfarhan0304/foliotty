@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Box, Text, useApp, useInput, useStdout } from 'ink';
 
 import type { PdfLink } from '../core/pdf-service.js';
-import { searchStyledLines } from '../core/search.js';
+import { createSearchIndex, searchIndexedLines } from '../core/search.js';
 import type { StyledLine } from '../core/structure.js';
 import { HelpOverlay } from './HelpOverlay.js';
 import {
@@ -126,9 +126,10 @@ export function App({ filename, pages }: AppProps): React.JSX.Element {
   const [activeHitIndex, setActiveHitIndex] = useState(0);
   const [awaitingSecondG, setAwaitingSecondG] = useState(false);
 
+  const searchIndex = useMemo(() => createSearchIndex(lines), [lines]);
   const hits = useMemo(
-    () => searchStyledLines(lines, activeQuery),
-    [activeQuery, lines],
+    () => searchIndexedLines(searchIndex, activeQuery),
+    [activeQuery, searchIndex],
   );
   const currentHit = hits[activeHitIndex] ?? null;
   const currentHitLineIndex = currentHit?.lineIndex ?? null;
