@@ -4,9 +4,11 @@ import { describe, test } from 'node:test';
 import type { TextItem } from '../pdf-service.js';
 import type { StyledLine } from '../structure.js';
 import {
+  detectAlignedTable,
   isTableLikeLine,
   postProcessTables,
   renderAsciiTable,
+  renderTableBlock,
   tableAwareSpacing,
 } from '../tables.js';
 
@@ -87,6 +89,53 @@ describe('tableAwareSpacing', () => {
   });
 });
 
+describe('detectAlignedTable', () => {
+  test('detects aligned rows and columns from text geometry', () => {
+    assert.deepEqual(
+      detectAlignedTable([
+        createItem('Name', { x: 72, y: 700 }),
+        createItem('Score', { x: 180, y: 700 }),
+        createItem('Ada', { x: 72, y: 684 }),
+        createItem('10', { x: 180, y: 684 }),
+      ]),
+      {
+        rows: [
+          ['Name', 'Score'],
+          ['Ada', '10'],
+        ],
+      },
+    );
+  });
+
+  test('keeps empty cells when a row has a missing column', () => {
+    assert.deepEqual(
+      detectAlignedTable([
+        createItem('Name', { x: 72, y: 700 }),
+        createItem('Role', { x: 180, y: 700 }),
+        createItem('Score', { x: 290, y: 700 }),
+        createItem('Ada', { x: 72, y: 684 }),
+        createItem('10', { x: 290, y: 684 }),
+      ]),
+      {
+        rows: [
+          ['Name', 'Role', 'Score'],
+          ['Ada', '', '10'],
+        ],
+      },
+    );
+  });
+
+  test('rejects prose without repeated aligned columns', () => {
+    assert.equal(
+      detectAlignedTable([
+        createItem('This is a normal paragraph.', { x: 72, y: 700 }),
+        createItem('It wraps on the next line.', { x: 72, y: 684 }),
+      ]),
+      null,
+    );
+  });
+});
+
 describe('renderAsciiTable', () => {
   test('renders padded terminal table rows', () => {
     assert.deepEqual(renderAsciiTable(['Name', 'Score'], ['Ada', '10']), [
@@ -96,6 +145,28 @@ describe('renderAsciiTable', () => {
       '| Ada  | 10    |',
       '+------+-------+',
     ]);
+  });
+});
+
+describe('renderTableBlock', () => {
+  test('renders multiple data rows', () => {
+    assert.deepEqual(
+      renderTableBlock({
+        rows: [
+          ['Name', 'Score'],
+          ['Ada', '10'],
+          ['Lin', '9'],
+        ],
+      }),
+      [
+        '+------+-------+',
+        '| Name | Score |',
+        '+------+-------+',
+        '| Ada  | 10    |',
+        '| Lin  | 9     |',
+        '+------+-------+',
+      ],
+    );
   });
 });
 
