@@ -10,6 +10,7 @@ import {
 
 export type StyledRun = {
   bold: boolean;
+  color?: string;
   italic: boolean;
   text: string;
 };
@@ -251,11 +252,17 @@ function makeRuns(items: TextItem[], bullet: boolean): StyledRun[] {
         ? ''
         : spacingBetween(previousContentItem, item, tableLike);
 
-    runs.push({
+    const run: StyledRun = {
       bold: isBoldFont(item.fontName),
       italic: isItalicFont(item.fontName),
       text: `${prefix}${text}`,
-    });
+    };
+
+    if (item.color !== undefined) {
+      run.color = item.color;
+    }
+
+    runs.push(run);
 
     previousContentItem = item;
   }
@@ -279,11 +286,17 @@ function makePlainRuns(items: TextItem[]): StyledRun[] {
         ? ''
         : spacingBetween(previousContentItem, item, false);
 
-    runs.push({
+    const run: StyledRun = {
       bold: isBoldFont(item.fontName),
       italic: isItalicFont(item.fontName),
       text: `${prefix}${text}`,
-    });
+    };
+
+    if (item.color !== undefined) {
+      run.color = item.color;
+    }
+
+    runs.push(run);
 
     previousContentItem = item;
   }

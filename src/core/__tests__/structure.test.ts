@@ -8,6 +8,7 @@ import type { TextItem } from '../pdf-service.js';
 function createItem(
   str: string,
   {
+    color,
     fontName = 'BodyFont',
     fontSize = 10,
     height = fontSize,
@@ -16,7 +17,7 @@ function createItem(
     y = 700,
   }: Partial<TextItem> = {},
 ): TextItem {
-  return {
+  const item: TextItem = {
     str,
     fontName,
     fontSize,
@@ -25,6 +26,12 @@ function createItem(
     x,
     y,
   };
+
+  if (color !== undefined) {
+    item.color = color;
+  }
+
+  return item;
 }
 
 function createLayout(items: TextItem[]): ColumnLayout {
@@ -90,6 +97,30 @@ describe('buildStyledLines', () => {
     assert.deepEqual(lines[0]?.runs, [
       { bold: true, italic: false, text: 'Acme Corp' },
       { bold: false, italic: true, text: ' Senior Engineer' },
+    ]);
+  });
+
+  test('preserves text color metadata on styled runs', () => {
+    const lines = buildStyledLines(
+      createLayout([
+        createItem('Red', {
+          color: '#ff0000',
+          width: 24,
+          x: 72,
+          y: 700,
+        }),
+        createItem('Blue', {
+          color: '#0000ff',
+          width: 30,
+          x: 110,
+          y: 700,
+        }),
+      ]),
+    );
+
+    assert.deepEqual(lines[0]?.runs, [
+      { bold: false, color: '#ff0000', italic: false, text: 'Red' },
+      { bold: false, color: '#0000ff', italic: false, text: ' Blue' },
     ]);
   });
 

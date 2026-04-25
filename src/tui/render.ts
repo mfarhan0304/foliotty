@@ -10,6 +10,10 @@ export type HighlightRange = {
 function applyRunStyles(text: string, run: StyledRun): string {
   let styled = text;
 
+  if (run.color !== undefined) {
+    styled = chalk.hex(run.color)(styled);
+  }
+
   if (run.bold) {
     styled = chalk.bold(styled);
   }
@@ -133,11 +137,17 @@ export function renderStyledLineSlice(
     const sliceEnd = Math.min(end, runEnd);
 
     if (sliceStart < sliceEnd) {
-      runs.push({
+      const slicedRun: StyledRun = {
         bold: run.bold,
         italic: run.italic,
         text: run.text.slice(sliceStart - runStart, sliceEnd - runStart),
-      });
+      };
+
+      if (run.color !== undefined) {
+        slicedRun.color = run.color;
+      }
+
+      runs.push(slicedRun);
     }
 
     offset = runEnd;
