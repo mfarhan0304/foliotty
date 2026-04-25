@@ -1,8 +1,10 @@
 import type { ColumnLayout } from './columns.js';
 import type { TextItem } from './pdf-service.js';
 import {
+  detectAlignedTable,
   isTableLikeLine,
   postProcessTables,
+  renderTableBlock,
   tableAwareSpacing,
 } from './tables.js';
 
@@ -99,6 +101,30 @@ function spacingBetween(
   }
 
   return gap > Math.max(2, previous.fontSize * 0.2) ? ' ' : '';
+}
+
+function hasTableColumnGap(items: TextItem[]): boolean {
+  const contentItems = items
+    .filter((item) => cleanText(item.str).length > 0)
+    .sort((left, right) => left.x - right.x);
+
+  for (let index = 1; index < contentItems.length; index += 1) {
+    const previous = contentItems[index - 1];
+    const current = contentItems[index];
+
+    if (previous === undefined || current === undefined) {
+      continue;
+    }
+
+    const previousRight = previous.x + previous.width;
+    const gap = current.x - previousRight;
+
+    if (gap > Math.max(16, previous.fontSize * 1.5)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function groupItemsIntoLines(items: TextItem[]): LineGroup[] {
@@ -237,6 +263,63 @@ function makeRuns(items: TextItem[], bullet: boolean): StyledRun[] {
   return runs;
 }
 
+function plainStyledLine(text: string): StyledLine {
+  return {
+    kind: 'body',
+    runs: text.length === 0 ? [] : [{ bold: false, italic: false, text }],
+    text,
+  };
+}
+
+function isTableCandidate(line: LineGroup): boolean {
+  return line.items.length >= 2 && hasTableColumnGap(line.items);
+}
+
+function detectTableAt(
+  lines: LineGroup[],
+  startIndex: number,
+): {
+  renderedLines: StyledLine[];
+  endIndex: number;
+  lastLine: LineGroup;
+} | null {
+  const candidateLines: LineGroup[] = [];
+
+  for (let index = startIndex; index < lines.length; index += 1) {
+    const line = lines[index];
+
+    if (line === undefined || !isTableCandidate(line)) {
+      break;
+    }
+
+    candidateLines.push(line);
+  }
+
+  if (candidateLines.length < 3) {
+    return null;
+  }
+
+  const table = detectAlignedTable(
+    candidateLines.flatMap((line) => line.items),
+  );
+
+  if (table === null || table.rows.length < 3) {
+    return null;
+  }
+
+  const lastLine = candidateLines.at(-1);
+
+  if (lastLine === undefined) {
+    return null;
+  }
+
+  return {
+    endIndex: startIndex + candidateLines.length - 1,
+    lastLine,
+    renderedLines: renderTableBlock(table).map(plainStyledLine),
+  };
+}
+
 export function buildStyledLines(layout: ColumnLayout): StyledLine[] {
   const lines = groupItemsIntoLines(layout.orderedItems);
   const thresholds = headingThreshold(lines);
@@ -247,7 +330,34 @@ export function buildStyledLines(layout: ColumnLayout): StyledLine[] {
   const result: StyledLine[] = [];
   let previousLine: LineGroup | undefined;
 
-  for (const line of lines) {
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+
+    if (line === undefined) {
+      continue;
+    }
+
+    const table = detectTableAt(lines, index);
+
+    if (table !== null) {
+      if (
+        previousLine &&
+        previousLine.y > line.y &&
+        previousLine.y - line.y > medianLineHeight * 1.5
+      ) {
+        result.push({
+          kind: 'blank',
+          runs: [],
+          text: '',
+        });
+      }
+
+      result.push(...table.renderedLines);
+      previousLine = table.lastLine;
+      index = table.endIndex;
+      continue;
+    }
+
     const bullet = line.items.some(
       (item, index) => index === 0 && isBulletMarker(item.str),
     );

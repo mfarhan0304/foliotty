@@ -175,4 +175,29 @@ describe('buildStyledLines', () => {
     assert.ok(lines.some((line) => line.text.startsWith('+------------+')));
     assert.ok(lines.some((line) => line.text.includes('| Table Head |')));
   });
+
+  test('renders aligned table blocks from item geometry', () => {
+    const lines = buildStyledLines(
+      createLayout([
+        createItem('Name', { width: 40, x: 72, y: 700 }),
+        createItem('Score', { width: 40, x: 180, y: 700 }),
+        createItem('Ada', { width: 24, x: 72, y: 684 }),
+        createItem('10', { width: 16, x: 180, y: 684 }),
+        createItem('Lin', { width: 24, x: 72, y: 668 }),
+        createItem('9', { width: 8, x: 180, y: 668 }),
+      ]),
+    );
+
+    assert.deepEqual(
+      lines.map((line) => line.text),
+      [
+        '+------+-------+',
+        '| Name | Score |',
+        '+------+-------+',
+        '| Ada  | 10    |',
+        '| Lin  | 9     |',
+        '+------+-------+',
+      ],
+    );
+  });
 });
