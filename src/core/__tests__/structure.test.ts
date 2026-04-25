@@ -140,4 +140,60 @@ describe('buildStyledLines', () => {
 
     assert.equal(lines[0]?.text, 'hello@example.com');
   });
+
+  test('renders large same-line gaps as table column separators', () => {
+    const lines = buildStyledLines(
+      createLayout([
+        createItem('Table Head', { width: 50, x: 72, y: 700 }),
+        createItem('Column Head', { width: 70, x: 180, y: 700 }),
+        createItem('text', { width: 40, x: 72, y: 680 }),
+        createItem('Text', { width: 30, x: 180, y: 680 }),
+      ]),
+    );
+
+    assert.deepEqual(
+      lines.map((line) => line.text),
+      ['Table Head | Column Head', '', 'text | Text'],
+    );
+  });
+
+  test('does not render large prose gaps as table separators', () => {
+    const lines = buildStyledLines(
+      createLayout([
+        createItem('Equation', { width: 45, x: 72, y: 700 }),
+        createItem('(1)', { width: 15, x: 180, y: 700 }),
+      ]),
+    );
+
+    assert.equal(lines[0]?.text, 'Equation (1)');
+  });
+
+  test('draws a simple table from split table header rows', () => {
+    const lines = buildStyledLines(
+      createLayout([
+        createItem('It is recommended to', { width: 100, x: 72, y: 720 }),
+        createItem('Table Column Head', { width: 90, x: 220, y: 720 }),
+        createItem('Table', { width: 30, x: 72, y: 700 }),
+        createItem('Head', { width: 30, x: 72, y: 680 }),
+        createItem('Table column subhead', { width: 100, x: 150, y: 680 }),
+        createItem('Subhead', { width: 40, x: 280, y: 680 }),
+        createItem('Subhead', { width: 40, x: 350, y: 680 }),
+        createItem('text', { width: 30, x: 72, y: 660 }),
+        createItem('Texta', { width: 35, x: 150, y: 660 }),
+      ]),
+    );
+
+    assert.deepEqual(
+      lines.map((line) => line.text),
+      [
+        'It is recommended to',
+        'Table Column Head',
+        '+------------+----------------------+---------+---------+',
+        '| Table Head | Table column subhead | Subhead | Subhead |',
+        '+------------+----------------------+---------+---------+',
+        '| text       | Texta                |         |         |',
+        '+------------+----------------------+---------+---------+',
+      ],
+    );
+  });
 });
