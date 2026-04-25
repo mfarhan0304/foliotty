@@ -22,6 +22,18 @@ describe('renderStyledLine', () => {
     assert.match(rendered, /\u001B\[38;2;255;0;0mRed/);
     assert.match(rendered, /\u001B\[38;2;0;0;255m Blue/);
   });
+
+  test('falls back to default text for unsafe PDF colors', () => {
+    const rendered = renderStyledLine({
+      kind: 'body',
+      runs: [
+        { bold: false, color: '#050505', italic: false, text: 'Near black' },
+      ],
+      text: 'Near black',
+    });
+
+    assert.equal(rendered, 'Near black');
+  });
 });
 
 describe('renderStyledLineSlice', () => {

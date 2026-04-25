@@ -1,6 +1,7 @@
 import chalk from 'chalk';
 
 import type { StyledLine, StyledRun } from '../core/structure.js';
+import { safeTerminalTextColor } from './color.js';
 
 export type HighlightRange = {
   end: number;
@@ -9,9 +10,10 @@ export type HighlightRange = {
 
 function applyRunStyles(text: string, run: StyledRun): string {
   let styled = text;
+  const safeColor = safeTerminalTextColor(run.color);
 
-  if (run.color !== undefined) {
-    styled = chalk.hex(run.color)(styled);
+  if (safeColor !== null) {
+    styled = chalk.hex(safeColor)(styled);
   }
 
   if (run.bold) {
