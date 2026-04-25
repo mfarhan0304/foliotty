@@ -1,10 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Box, Text, useApp, useInput, useStdout } from 'ink';
 
 import type { PdfLink } from '../core/pdf-service.js';
-import { searchStyledLines, type SearchHit } from '../core/search.js';
+import { searchStyledLines } from '../core/search.js';
 import type { StyledLine } from '../core/structure.js';
 import { HelpOverlay } from './HelpOverlay.js';
+import {
+  countWrappedRows,
+  lineIndexAtRowOffset,
+  rowOffsetForLine,
+} from './layout.js';
 import { ResumeView } from './ResumeView.js';
 import { SearchPrompt } from './SearchPrompt.js';
 import { StatusBar } from './StatusBar.js';
@@ -19,27 +24,33 @@ type AppProps = {
   pages: PageBundle[];
 };
 
+type Mode = 'help' | 'normal' | 'page' | 'search';
+
+type DisplayPage = {
+  lines: StyledLine[];
+};
+
 type FlattenedDocument = {
+  displayPages: DisplayPage[];
   lines: StyledLine[];
   pageStarts: number[];
 };
 
-function flattenPages(pages: PageBundle[]): FlattenedDocument {
-  const lines: StyledLine[] = [];
-  const pageStarts: number[] = [];
+function toDisplayPages(pages: PageBundle[]): DisplayPage[] {
+  return pages.map((page) => {
+    if (page.links.length === 0) {
+      return { lines: page.lines };
+    }
 
-  for (const [index, page] of pages.entries()) {
-    pageStarts.push(lines.length);
-    lines.push(...page.lines);
-
-    if (page.links.length > 0) {
-      lines.push({ kind: 'blank', runs: [], text: '' });
-      lines.push({
-        kind: 'h2',
-        runs: [{ bold: true, italic: false, text: 'Links' }],
-        text: 'Links',
-      });
-      lines.push(
+    return {
+      lines: [
+        ...page.lines,
+        { kind: 'blank', runs: [], text: '' },
+        {
+          kind: 'h2',
+          runs: [{ bold: true, italic: false, text: 'Links' }],
+          text: 'Links',
+        },
         ...page.links.map((link) => ({
           kind: 'bullet' as const,
           runs: [
@@ -51,19 +62,26 @@ function flattenPages(pages: PageBundle[]): FlattenedDocument {
           ],
           text: `  • ${link.text} -> ${link.url}`,
         })),
-      );
-    }
+      ],
+    };
+  });
+}
 
-    if (index < pages.length - 1) {
+function flattenPages(pages: PageBundle[]): FlattenedDocument {
+  const displayPages = toDisplayPages(pages);
+  const lines: StyledLine[] = [];
+  const pageStarts: number[] = [];
+
+  for (const [index, page] of displayPages.entries()) {
+    pageStarts.push(lines.length);
+    lines.push(...page.lines);
+
+    if (index < displayPages.length - 1) {
       lines.push({ kind: 'blank', runs: [], text: '' });
     }
   }
 
-  return { lines, pageStarts };
-}
-
-function hitRangesByLine(hits: SearchHit[]): Map<number, SearchHit['ranges']> {
-  return new Map(hits.map((hit) => [hit.lineIndex, hit.ranges]));
+  return { displayPages, lines, pageStarts };
 }
 
 function pageForLine(lineIndex: number, pageStarts: number[]): number {
@@ -84,46 +102,157 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
+function sanitizePageValue(value: string): string {
+  return value.replaceAll(/[^\d]/gu, '');
+}
+
 export function App({ filename, pages }: AppProps): React.JSX.Element {
   const { exit } = useApp();
   const { stdout } = useStdout();
-  const { lines, pageStarts } = flattenPages(pages);
-  const visibleLineCount = Math.max(1, (stdout.rows ?? 24) - 4);
-  const [mode, setMode] = useState<'help' | 'normal' | 'search'>('normal');
-  const [scrollOffset, setScrollOffset] = useState(0);
+  const { displayPages, lines, pageStarts } = useMemo(
+    () => flattenPages(pages),
+    [pages],
+  );
+  const contentWidth = Math.max(20, (stdout.columns ?? 80) - 2);
+  const visibleRowCount = Math.max(1, (stdout.rows ?? 24) - 4);
+  const [mode, setMode] = useState<Mode>('normal');
+  const [currentPageIndex, setCurrentPageIndex] = useState(0);
+  const [pageScrollOffsets, setPageScrollOffsets] = useState<number[]>(
+    displayPages.map(() => 0),
+  );
   const [searchValue, setSearchValue] = useState('');
+  const [pageValue, setPageValue] = useState('');
   const [activeQuery, setActiveQuery] = useState('');
   const [activeHitIndex, setActiveHitIndex] = useState(0);
   const [awaitingSecondG, setAwaitingSecondG] = useState(false);
 
-  const hits = searchStyledLines(lines, activeQuery);
+  const hits = useMemo(
+    () => searchStyledLines(lines, activeQuery),
+    [activeQuery, lines],
+  );
   const currentHit = hits[activeHitIndex] ?? null;
-  const currentLine = currentHit?.lineIndex ?? scrollOffset;
-  const currentPage = pageForLine(currentLine, pageStarts);
+  const currentHitLineIndex = currentHit?.lineIndex ?? null;
+  const currentPage = displayPages[currentPageIndex] ?? { lines: [] };
+  const currentPageStart = pageStarts[currentPageIndex] ?? 0;
+  const currentPageScrollOffset = pageScrollOffsets[currentPageIndex] ?? 0;
+  const currentPageNumber = currentPageIndex + 1;
+  const pageCount = displayPages.length;
+  const currentHitPage =
+    currentHitLineIndex === null
+      ? null
+      : pageForLine(currentHitLineIndex, pageStarts);
+  const currentHitLocalLineIndex =
+    currentHitPage === currentPageNumber && currentHitLineIndex !== null
+      ? currentHitLineIndex - currentPageStart
+      : null;
+  const currentLine =
+    currentHitLocalLineIndex ??
+    lineIndexAtRowOffset(
+      currentPage.lines,
+      currentPageScrollOffset,
+      contentWidth,
+    );
 
-  useEffect(() => {
-    if (!stdout.isTTY) {
-      return undefined;
-    }
+  function maxScrollForPage(pageIndex: number): number {
+    return Math.max(
+      0,
+      countWrappedRows(displayPages[pageIndex]?.lines ?? [], contentWidth) -
+        visibleRowCount,
+    );
+  }
 
-    stdout.write('\u001B[?1049h');
+  function updatePageScroll(pageIndex: number, nextValue: number): void {
+    setPageScrollOffsets((offsets) => {
+      const target = clamp(nextValue, 0, maxScrollForPage(pageIndex));
 
-    return () => {
-      stdout.write('\u001B[?1049l');
-    };
-  }, [stdout]);
+      if ((offsets[pageIndex] ?? 0) === target) {
+        return offsets;
+      }
 
-  useEffect(() => {
-    if (currentHit) {
-      setScrollOffset((existing) =>
-        clamp(
-          currentHit.lineIndex,
-          0,
-          Math.max(0, lines.length - visibleLineCount),
-        ),
+      return offsets.map((offset, index) =>
+        index === pageIndex ? target : offset,
       );
+    });
+  }
+
+  function moveToPage(pageIndex: number): void {
+    setCurrentPageIndex((current) => {
+      const next = clamp(pageIndex, 0, Math.max(0, pageCount - 1));
+      return current === next ? current : next;
+    });
+  }
+
+  function submitSearch(value: string): void {
+    setActiveQuery(value);
+    setActiveHitIndex(0);
+    setMode('normal');
+  }
+
+  function submitPageJump(value: string): void {
+    const parsed = Number.parseInt(value, 10);
+
+    if (Number.isFinite(parsed)) {
+      moveToPage(parsed - 1);
     }
-  }, [currentHit, lines.length, visibleLineCount]);
+
+    setPageValue('');
+    setMode('normal');
+  }
+
+  useEffect(() => {
+    setPageScrollOffsets((offsets) => {
+      const nextOffsets = displayPages.map((_, index) =>
+        clamp(offsets[index] ?? 0, 0, maxScrollForPage(index)),
+      );
+      const changed =
+        nextOffsets.length !== offsets.length ||
+        nextOffsets.some((value, index) => value !== offsets[index]);
+
+      return changed ? nextOffsets : offsets;
+    });
+  }, [contentWidth, displayPages, visibleRowCount]);
+
+  useEffect(() => {
+    if (currentHitLineIndex !== null) {
+      const pageIndex = pageForLine(currentHitLineIndex, pageStarts) - 1;
+      const pageStart = pageStarts[pageIndex] ?? 0;
+      const targetScroll = rowOffsetForLine(
+        displayPages[pageIndex]?.lines ?? [],
+        currentHitLineIndex - pageStart,
+        contentWidth,
+      );
+
+      if (currentPageIndex !== pageIndex) {
+        moveToPage(pageIndex);
+      }
+
+      if ((pageScrollOffsets[pageIndex] ?? 0) !== targetScroll) {
+        updatePageScroll(pageIndex, targetScroll);
+      }
+    }
+  }, [
+    contentWidth,
+    currentHitLineIndex,
+    currentPageIndex,
+    displayPages,
+    pageScrollOffsets,
+    pageStarts,
+  ]);
+
+  const currentPageHitRanges = useMemo(
+    () =>
+      new Map(
+        hits
+          .filter(
+            (hit) =>
+              pageForLine(hit.lineIndex, pageStarts) === currentPageNumber,
+          )
+          .map(
+            (hit) => [hit.lineIndex - currentPageStart, hit.ranges] as const,
+          ),
+      ),
+    [currentPageNumber, currentPageStart, hits, pageStarts],
+  );
 
   useInput((input, key) => {
     if (mode === 'search') {
@@ -133,10 +262,14 @@ export function App({ filename, pages }: AppProps): React.JSX.Element {
         return;
       }
 
-      if (key.return) {
-        setActiveQuery(searchValue);
-        setActiveHitIndex(0);
+      return;
+    }
+
+    if (mode === 'page') {
+      if (key.escape) {
         setMode('normal');
+        setPageValue('');
+        setAwaitingSecondG(false);
       }
 
       return;
@@ -167,41 +300,38 @@ export function App({ filename, pages }: AppProps): React.JSX.Element {
       return;
     }
 
+    if (input === 'p') {
+      setPageValue('');
+      setMode('page');
+      setAwaitingSecondG(false);
+      return;
+    }
+
     if (input === 'j') {
-      setScrollOffset((value) =>
-        clamp(value + 1, 0, Math.max(0, lines.length - visibleLineCount)),
-      );
+      updatePageScroll(currentPageIndex, currentPageScrollOffset + 1);
       setAwaitingSecondG(false);
       return;
     }
 
     if (input === 'k') {
-      setScrollOffset((value) =>
-        clamp(value - 1, 0, Math.max(0, lines.length - visibleLineCount)),
-      );
+      updatePageScroll(currentPageIndex, currentPageScrollOffset - 1);
       setAwaitingSecondG(false);
       return;
     }
 
     if (key.ctrl && input === 'd') {
-      setScrollOffset((value) =>
-        clamp(
-          value + Math.floor(visibleLineCount / 2),
-          0,
-          Math.max(0, lines.length - visibleLineCount),
-        ),
+      updatePageScroll(
+        currentPageIndex,
+        currentPageScrollOffset + Math.floor(visibleRowCount / 2),
       );
       setAwaitingSecondG(false);
       return;
     }
 
     if (key.ctrl && input === 'u') {
-      setScrollOffset((value) =>
-        clamp(
-          value - Math.floor(visibleLineCount / 2),
-          0,
-          Math.max(0, lines.length - visibleLineCount),
-        ),
+      updatePageScroll(
+        currentPageIndex,
+        currentPageScrollOffset - Math.floor(visibleRowCount / 2),
       );
       setAwaitingSecondG(false);
       return;
@@ -220,18 +350,30 @@ export function App({ filename, pages }: AppProps): React.JSX.Element {
     }
 
     if (input === 'G') {
-      setScrollOffset(Math.max(0, lines.length - visibleLineCount));
+      updatePageScroll(currentPageIndex, maxScrollForPage(currentPageIndex));
       setAwaitingSecondG(false);
       return;
     }
 
     if (input === 'g') {
       if (awaitingSecondG) {
-        setScrollOffset(0);
+        updatePageScroll(currentPageIndex, 0);
         setAwaitingSecondG(false);
       } else {
         setAwaitingSecondG(true);
       }
+      return;
+    }
+
+    if (input === 'J') {
+      moveToPage(currentPageIndex + 1);
+      setAwaitingSecondG(false);
+      return;
+    }
+
+    if (input === 'K') {
+      moveToPage(currentPageIndex - 1);
+      setAwaitingSecondG(false);
       return;
     }
 
@@ -245,30 +387,48 @@ export function App({ filename, pages }: AppProps): React.JSX.Element {
           <HelpOverlay />
         ) : (
           <ResumeView
-            currentHitLineIndex={currentHit?.lineIndex ?? null}
-            hitRangesByLine={hitRangesByLine(hits)}
-            lines={lines}
-            scrollOffset={scrollOffset}
-            visibleLineCount={visibleLineCount}
+            contentWidth={contentWidth}
+            currentHitLineIndex={currentHitLocalLineIndex}
+            hitRangesByLine={currentPageHitRanges}
+            lines={currentPage.lines}
+            scrollOffset={currentPageScrollOffset}
+            visibleRowCount={visibleRowCount}
           />
         )}
       </Box>
       {mode === 'search' ? (
-        <SearchPrompt value={searchValue} onChange={setSearchValue} />
+        <SearchPrompt
+          value={searchValue}
+          onChange={setSearchValue}
+          onSubmit={submitSearch}
+        />
+      ) : mode === 'page' ? (
+        <SearchPrompt
+          label=":"
+          value={pageValue}
+          onChange={(value) => setPageValue(sanitizePageValue(value))}
+          onSubmit={submitPageJump}
+        />
       ) : (
         <StatusBar
           currentLine={currentLine}
           filename={filename}
           hitCount={hits.length}
           mode={mode}
-          page={currentPage}
-          pageCount={pages.length}
-          totalLines={lines.length}
+          page={currentPageNumber}
+          pageCount={pageCount}
+          totalLines={currentPage.lines.length}
         />
       )}
       {mode === 'search' ? (
         <Box paddingX={1}>
           <Text dimColor>Enter submit · Esc cancel</Text>
+        </Box>
+      ) : mode === 'page' ? (
+        <Box paddingX={1}>
+          <Text dimColor>
+            Enter jump to page · Esc cancel · range 1-{pageCount}
+          </Text>
         </Box>
       ) : null}
     </Box>

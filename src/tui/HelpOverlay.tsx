@@ -14,6 +14,8 @@ export function HelpOverlay(): React.JSX.Element {
       <Text>j / k scroll one line</Text>
       <Text>Ctrl-D / Ctrl-U scroll half page</Text>
       <Text>gg / G top or bottom</Text>
+      <Text>J / K next or previous page</Text>
+      <Text>p go to page</Text>
       <Text>/ open search</Text>
       <Text>Enter submit search</Text>
       <Text>Esc cancel search or help</Text>

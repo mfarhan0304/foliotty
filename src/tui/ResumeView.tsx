@@ -2,38 +2,101 @@ import React from 'react';
 import { Box, Text } from 'ink';
 
 import type { StyledLine } from '../core/structure.js';
-import { renderStyledLine } from './render.js';
+import { wrapTextSegments } from './layout.js';
+import { renderStyledLineSlice } from './render.js';
 
 type ResumeViewProps = {
+  contentWidth: number;
   currentHitLineIndex: number | null;
   hitRangesByLine: Map<number, Array<{ end: number; start: number }>>;
   lines: StyledLine[];
   scrollOffset: number;
-  visibleLineCount: number;
+  visibleRowCount: number;
 };
 
+type ViewSegment = {
+  isFirstRow: boolean;
+  lineIndex: number;
+  segmentEnd: number;
+  segmentStart: number;
+};
+
+function getVisibleSegments(
+  lines: StyledLine[],
+  contentWidth: number,
+  scrollOffset: number,
+  visibleRowCount: number,
+): ViewSegment[] {
+  const segments: ViewSegment[] = [];
+  const availableWidth = Math.max(1, contentWidth - 2);
+  let skippedRows = 0;
+
+  for (const [lineIndex, line] of lines.entries()) {
+    const wrapped = wrapTextSegments(line.text, availableWidth);
+
+    for (const [rowIndex, segment] of wrapped.entries()) {
+      if (skippedRows < scrollOffset) {
+        skippedRows += 1;
+        continue;
+      }
+
+      if (segments.length >= visibleRowCount) {
+        break;
+      }
+
+      segments.push({
+        isFirstRow: rowIndex === 0,
+        lineIndex,
+        segmentEnd: segment.end,
+        segmentStart: segment.start,
+      });
+    }
+
+    if (segments.length >= visibleRowCount) {
+      break;
+    }
+  }
+
+  return segments;
+}
+
 export function ResumeView({
+  contentWidth,
   currentHitLineIndex,
   hitRangesByLine,
   lines,
   scrollOffset,
-  visibleLineCount,
+  visibleRowCount,
 }: ResumeViewProps): React.JSX.Element {
-  const visibleLines = lines.slice(
+  const segments = getVisibleSegments(
+    lines,
+    contentWidth,
     scrollOffset,
-    Math.min(lines.length, scrollOffset + visibleLineCount),
+    visibleRowCount,
   );
 
   return (
     <Box flexDirection="column">
-      {visibleLines.map((line, index) => {
-        const lineIndex = scrollOffset + index;
-        const prefix = currentHitLineIndex === lineIndex ? '> ' : '  ';
+      {segments.map((segment) => {
+        const line = lines[segment.lineIndex];
+        const prefix =
+          currentHitLineIndex === segment.lineIndex && segment.isFirstRow
+            ? '> '
+            : '  ';
 
         return (
-          <Text key={`${lineIndex}:${line.text}`}>
+          <Text
+            key={`${segment.lineIndex}:${segment.segmentStart}:${segment.segmentEnd}`}
+          >
             {prefix}
-            {renderStyledLine(line, hitRangesByLine.get(lineIndex) ?? [])}
+            {line
+              ? renderStyledLineSlice(
+                  line,
+                  segment.segmentStart,
+                  segment.segmentEnd,
+                  hitRangesByLine.get(segment.lineIndex) ?? [],
+                )
+              : ''}
           </Text>
         );
       })}

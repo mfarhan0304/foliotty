@@ -53,7 +53,17 @@ try {
   }));
 
   if (process.stdout.isTTY && process.stdin.isTTY) {
-    render(React.createElement(App, { filename: basename(filePath), pages }));
+    process.stdout.write('\u001B[?1049h\u001B[2J\u001B[3J\u001B[H');
+
+    const inkApp = render(
+      React.createElement(App, { filename: basename(filePath), pages }),
+    );
+
+    try {
+      await inkApp.waitUntilExit();
+    } finally {
+      process.stdout.write('\u001B[?1049l');
+    }
   } else {
     const output = pages
       .map((page) => {
