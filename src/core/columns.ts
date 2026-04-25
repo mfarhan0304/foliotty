@@ -282,11 +282,7 @@ function isInsideColumnBand(
 ): boolean {
   const [leftPeak, rightPeak] = peaks;
 
-  if (
-    leftPeak === undefined ||
-    rightPeak === undefined ||
-    peaks.length !== 2
-  ) {
+  if (leftPeak === undefined || rightPeak === undefined || peaks.length !== 2) {
     return false;
   }
 
