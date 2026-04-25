@@ -11,10 +11,10 @@ export function HelpOverlay(): React.JSX.Element {
       width={54}
     >
       <Text bold>Keys</Text>
-      <Text>j / k scroll one line</Text>
+      <Text>j / k previous or next line</Text>
       <Text>Ctrl-D / Ctrl-U scroll half page</Text>
       <Text>gg / G top or bottom</Text>
-      <Text>J / K next or previous page</Text>
+      <Text>J / K previous or next page</Text>
       <Text>p go to page</Text>
       <Text>l open links on current page</Text>
       <Text>Enter open selected link</Text>

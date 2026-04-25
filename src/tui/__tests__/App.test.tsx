@@ -62,7 +62,7 @@ describe('App', () => {
     assert.match(frame, /page 1\/1/);
   });
 
-  test('turns pages with J and K', async () => {
+  test('turns pages with J for previous and K for next', async () => {
     const result = render(
       <App
         filename="resume.pdf"
@@ -79,13 +79,13 @@ describe('App', () => {
       />,
     );
 
-    result.stdin.write('J');
+    result.stdin.write('K');
     await tick(20);
     let frame = result.lastFrame() ?? '';
     assert.match(frame, /Page Two/);
     assert.match(frame, /page 2\/2/);
 
-    result.stdin.write('K');
+    result.stdin.write('J');
     await tick(20);
     frame = result.lastFrame() ?? '';
     assert.match(frame, /Page One/);
@@ -162,7 +162,7 @@ describe('App', () => {
 
     result.stdin.write('l');
     await tick(20);
-    result.stdin.write('j');
+    result.stdin.write('k');
     await tick(20);
     result.stdin.write('\r');
     await tick(20);

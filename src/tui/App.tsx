@@ -316,12 +316,12 @@ export function App({
       }
 
       if (input === 'j') {
-        moveSelectedLink(1);
+        moveSelectedLink(-1);
         return;
       }
 
       if (input === 'k') {
-        moveSelectedLink(-1);
+        moveSelectedLink(1);
         return;
       }
 
@@ -371,13 +371,13 @@ export function App({
     }
 
     if (input === 'j') {
-      updatePageScroll(currentPageIndex, currentPageScrollOffset + 1);
+      updatePageScroll(currentPageIndex, currentPageScrollOffset - 1);
       setAwaitingSecondG(false);
       return;
     }
 
     if (input === 'k') {
-      updatePageScroll(currentPageIndex, currentPageScrollOffset - 1);
+      updatePageScroll(currentPageIndex, currentPageScrollOffset + 1);
       setAwaitingSecondG(false);
       return;
     }
@@ -429,13 +429,13 @@ export function App({
     }
 
     if (input === 'J') {
-      moveToPage(currentPageIndex + 1);
+      moveToPage(currentPageIndex - 1);
       setAwaitingSecondG(false);
       return;
     }
 
     if (input === 'K') {
-      moveToPage(currentPageIndex - 1);
+      moveToPage(currentPageIndex + 1);
       setAwaitingSecondG(false);
       return;
     }
