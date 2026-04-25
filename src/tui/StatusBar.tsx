@@ -3,6 +3,7 @@ import { Box, Text } from 'ink';
 
 type StatusBarProps = {
   currentLine: number;
+  displayMode: 'preview' | 'text';
   filename: string;
   hitCount: number;
   mode: 'help' | 'links' | 'normal' | 'page' | 'search';
@@ -13,6 +14,7 @@ type StatusBarProps = {
 
 export function StatusBar({
   currentLine,
+  displayMode,
   filename,
   hitCount,
   mode,
@@ -24,7 +26,7 @@ export function StatusBar({
     <Box borderStyle="single" paddingX={1}>
       <Text>
         {filename} · line {Math.min(currentLine + 1, totalLines)}/{totalLines} ·
-        page {page}/{pageCount} · {mode} · {hitCount} hit
+        page {page}/{pageCount} · {displayMode} · {mode} · {hitCount} hit
         {hitCount === 1 ? '' : 's'}
       </Text>
     </Box>

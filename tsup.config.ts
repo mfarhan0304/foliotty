@@ -4,6 +4,7 @@ export default defineConfig({
   clean: true,
   dts: false,
   entry: ['src/cli.ts'],
+  external: ['@napi-rs/canvas'],
   format: ['esm'],
   outDir: 'dist',
   platform: 'node',

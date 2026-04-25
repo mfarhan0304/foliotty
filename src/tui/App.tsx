@@ -2,10 +2,12 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Box, Text, useApp, useInput, useStdout } from 'ink';
 
 import type { PdfLink } from '../core/pdf-service.js';
+import type { RasterPage } from '../core/raster.js';
 import { createSearchIndex, searchIndexedLines } from '../core/search.js';
 import type { StyledLine } from '../core/structure.js';
 import { HelpOverlay } from './HelpOverlay.js';
 import { LinkOverlay } from './LinkOverlay.js';
+import type { GraphicsCapability } from './graphics.js';
 import {
   countWrappedRows,
   lineIndexAtRowOffset,
@@ -13,6 +15,7 @@ import {
 } from './layout.js';
 import { openUrl as defaultOpenUrl } from './open-url.js';
 import type { OpenUrl } from './open-url.js';
+import { PreviewView, supportsInlinePreview } from './PreviewView.js';
 import { ResumeView } from './ResumeView.js';
 import { SearchPrompt } from './SearchPrompt.js';
 import { StatusBar } from './StatusBar.js';
@@ -24,10 +27,13 @@ type PageBundle = {
 
 type AppProps = {
   filename: string;
+  graphicsCapability?: GraphicsCapability;
   openUrl?: OpenUrl;
   pages: PageBundle[];
+  previewPages?: RasterPage[];
 };
 
+type DisplayMode = 'preview' | 'text';
 type Mode = 'help' | 'links' | 'normal' | 'page' | 'search';
 
 type DisplayPage = {
@@ -112,8 +118,10 @@ function sanitizePageValue(value: string): string {
 
 export function App({
   filename,
+  graphicsCapability = 'none',
   openUrl = defaultOpenUrl,
   pages,
+  previewPages = [],
 }: AppProps): React.JSX.Element {
   const { exit } = useApp();
   const { stdout } = useStdout();
@@ -123,6 +131,11 @@ export function App({
   );
   const contentWidth = Math.max(20, (stdout.columns ?? 80) - 2);
   const visibleRowCount = Math.max(1, (stdout.rows ?? 24) - 4);
+  const previewAvailable =
+    previewPages.length > 0 && supportsInlinePreview(graphicsCapability);
+  const [displayMode, setDisplayMode] = useState<DisplayMode>(
+    previewAvailable ? 'preview' : 'text',
+  );
   const [mode, setMode] = useState<Mode>('normal');
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [pageScrollOffsets, setPageScrollOffsets] = useState<number[]>(
@@ -232,6 +245,12 @@ export function App({
       return changed ? nextOffsets : offsets;
     });
   }, [contentWidth, displayPages, visibleRowCount]);
+
+  useEffect(() => {
+    if (!previewAvailable && displayMode === 'preview') {
+      setDisplayMode('text');
+    }
+  }, [displayMode, previewAvailable]);
 
   useEffect(() => {
     setSelectedLinkIndex((current) =>
@@ -351,6 +370,7 @@ export function App({
 
     if (input === '/') {
       setSearchValue(activeQuery);
+      setDisplayMode('text');
       setMode('search');
       setAwaitingSecondG(false);
       return;
@@ -366,6 +386,14 @@ export function App({
     if (input === 'p') {
       setPageValue('');
       setMode('page');
+      setAwaitingSecondG(false);
+      return;
+    }
+
+    if (input === 't') {
+      setDisplayMode((current) =>
+        current === 'preview' || !previewAvailable ? 'text' : 'preview',
+      );
       setAwaitingSecondG(false);
       return;
     }
@@ -453,6 +481,11 @@ export function App({
             links={currentPageLinks}
             selectedIndex={selectedLinkIndex}
           />
+        ) : displayMode === 'preview' ? (
+          <PreviewView
+            capability={graphicsCapability}
+            page={previewPages[currentPageIndex]}
+          />
         ) : (
           <ResumeView
             contentWidth={contentWidth}
@@ -480,6 +513,7 @@ export function App({
       ) : (
         <StatusBar
           currentLine={currentLine}
+          displayMode={displayMode}
           filename={filename}
           hitCount={hits.length}
           mode={mode}

@@ -16,6 +16,7 @@ export function HelpOverlay(): React.JSX.Element {
       <Text>gg / G top or bottom</Text>
       <Text>J / K previous or next page</Text>
       <Text>p go to page</Text>
+      <Text>t toggle preview or text mode</Text>
       <Text>l open links on current page</Text>
       <Text>Enter open selected link</Text>
       <Text>/ open search</Text>

@@ -4,6 +4,7 @@ import { afterEach, describe, test } from 'node:test';
 import { cleanup, render } from 'ink-testing-library';
 
 import type { PdfLink } from '../../core/pdf-service.js';
+import type { RasterPage } from '../../core/raster.js';
 import type { StyledLine } from '../../core/structure.js';
 import { App } from '../App.js';
 
@@ -30,6 +31,15 @@ function createLink(text: string, url: string): PdfLink {
     width: 40,
     x: 0,
     y: 0,
+  };
+}
+
+function createRasterPage(): RasterPage {
+  return {
+    height: 1,
+    pageNumber: 1,
+    png: Buffer.from('png'),
+    width: 1,
   };
 }
 
@@ -60,6 +70,50 @@ describe('App', () => {
     assert.match(frame, /Software Engineer/);
     assert.match(frame, /resume\.pdf/);
     assert.match(frame, /page 1\/1/);
+    assert.match(frame, /text/);
+  });
+
+  test('starts in preview mode when raster pages are available', () => {
+    const result = render(
+      <App
+        filename="resume.pdf"
+        graphicsCapability="kitty"
+        pages={[
+          {
+            lines: [createLine('Text Mode')],
+            links: [],
+          },
+        ]}
+        previewPages={[createRasterPage()]}
+      />,
+    );
+
+    const frame = result.lastFrame() ?? '';
+    assert.match(frame, /preview/);
+    assert.doesNotMatch(frame, /Text Mode/);
+  });
+
+  test('toggles from preview mode to text mode', async () => {
+    const result = render(
+      <App
+        filename="resume.pdf"
+        graphicsCapability="kitty"
+        pages={[
+          {
+            lines: [createLine('Text Mode')],
+            links: [],
+          },
+        ]}
+        previewPages={[createRasterPage()]}
+      />,
+    );
+
+    result.stdin.write('t');
+    await tick(20);
+
+    const frame = result.lastFrame() ?? '';
+    assert.match(frame, /Text Mode/);
+    assert.match(frame, /text/);
   });
 
   test('turns pages with J for previous and K for next', async () => {

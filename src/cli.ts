@@ -10,8 +10,14 @@ import { detectColumns } from './core/columns.js';
 import { NoTextLayerError, PdfLoadError } from './core/errors.js';
 import { openPdf } from './core/pdf-service.js';
 import type { PdfLink } from './core/pdf-service.js';
+import {
+  RasterBackendUnavailableError,
+  renderPdfPageToPng,
+} from './core/raster.js';
 import { buildStyledLines } from './core/structure.js';
 import { App } from './tui/App.js';
+import { detectGraphicsCapability } from './tui/graphics.js';
+import { supportsInlinePreview } from './tui/PreviewView.js';
 import { renderStyledLine } from './tui/render.js';
 
 function renderLinks(links: PdfLink[]): string {
@@ -54,10 +60,36 @@ try {
   }));
 
   if (process.stdout.isTTY && process.stdin.isTTY) {
+    const graphicsCapability = detectGraphicsCapability();
+    const previewPages = supportsInlinePreview(graphicsCapability)
+      ? await Promise.all(
+          Array.from({ length: document.numPages }, (_, index) =>
+            renderPdfPageToPng(filePath, {
+              pageNumber: index + 1,
+              width: Math.max(
+                320,
+                Math.min(1000, (process.stdout.columns ?? 80) * 8),
+              ),
+            }),
+          ),
+        ).catch((error: unknown) => {
+          if (error instanceof RasterBackendUnavailableError) {
+            return [];
+          }
+
+          throw error;
+        })
+      : [];
+
     process.stdout.write('\u001B[?1049h\u001B[2J\u001B[3J\u001B[H');
 
     const inkApp = render(
-      React.createElement(App, { filename: basename(filePath), pages }),
+      React.createElement(App, {
+        filename: basename(filePath),
+        graphicsCapability,
+        pages,
+        previewPages,
+      }),
     );
 
     try {
