@@ -115,4 +115,82 @@ describe('App', () => {
     assert.match(frame, /Page Three/);
     assert.match(frame, /page 3\/3/);
   });
+
+  test('opens link selection mode for the current page', async () => {
+    const result = render(
+      <App
+        filename="resume.pdf"
+        pages={[
+          {
+            lines: [createLine('Page One')],
+            links: [
+              createLink('GitHub', 'https://github.com/example'),
+              createLink('Email', 'mailto:test@example.com'),
+            ],
+          },
+        ]}
+      />,
+    );
+
+    result.stdin.write('l');
+    await tick(20);
+
+    const frame = result.lastFrame() ?? '';
+    assert.match(frame, /Links/);
+    assert.match(frame, /> 1\. GitHub -> https:\/\/github\.com\/example/);
+    assert.match(frame, /  2\. Email -> mailto:test@example\.com/);
+    assert.match(frame, /links/);
+  });
+
+  test('moves link selection and opens the selected link', async () => {
+    const openedUrls: string[] = [];
+    const result = render(
+      <App
+        filename="resume.pdf"
+        openUrl={(url) => openedUrls.push(url)}
+        pages={[
+          {
+            lines: [createLine('Page One')],
+            links: [
+              createLink('GitHub', 'https://github.com/example'),
+              createLink('Email', 'mailto:test@example.com'),
+            ],
+          },
+        ]}
+      />,
+    );
+
+    result.stdin.write('l');
+    await tick(20);
+    result.stdin.write('j');
+    await tick(20);
+    result.stdin.write('\r');
+    await tick(20);
+
+    assert.deepEqual(openedUrls, ['mailto:test@example.com']);
+    assert.match(result.lastFrame() ?? '', /> 2\. Email/);
+  });
+
+  test('exits link selection mode with escape', async () => {
+    const result = render(
+      <App
+        filename="resume.pdf"
+        pages={[
+          {
+            lines: [createLine('Page One')],
+            links: [createLink('GitHub', 'https://github.com/example')],
+          },
+        ]}
+      />,
+    );
+
+    result.stdin.write('l');
+    await tick(20);
+    result.stdin.write('\u001B');
+    await tick(20);
+
+    const frame = result.lastFrame() ?? '';
+    assert.match(frame, /Page One/);
+    assert.match(frame, /normal/);
+  });
 });

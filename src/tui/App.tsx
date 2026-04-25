@@ -5,11 +5,14 @@ import type { PdfLink } from '../core/pdf-service.js';
 import { createSearchIndex, searchIndexedLines } from '../core/search.js';
 import type { StyledLine } from '../core/structure.js';
 import { HelpOverlay } from './HelpOverlay.js';
+import { LinkOverlay } from './LinkOverlay.js';
 import {
   countWrappedRows,
   lineIndexAtRowOffset,
   rowOffsetForLine,
 } from './layout.js';
+import { openUrl as defaultOpenUrl } from './open-url.js';
+import type { OpenUrl } from './open-url.js';
 import { ResumeView } from './ResumeView.js';
 import { SearchPrompt } from './SearchPrompt.js';
 import { StatusBar } from './StatusBar.js';
@@ -21,10 +24,11 @@ type PageBundle = {
 
 type AppProps = {
   filename: string;
+  openUrl?: OpenUrl;
   pages: PageBundle[];
 };
 
-type Mode = 'help' | 'normal' | 'page' | 'search';
+type Mode = 'help' | 'links' | 'normal' | 'page' | 'search';
 
 type DisplayPage = {
   lines: StyledLine[];
@@ -106,7 +110,11 @@ function sanitizePageValue(value: string): string {
   return value.replaceAll(/[^\d]/gu, '');
 }
 
-export function App({ filename, pages }: AppProps): React.JSX.Element {
+export function App({
+  filename,
+  openUrl = defaultOpenUrl,
+  pages,
+}: AppProps): React.JSX.Element {
   const { exit } = useApp();
   const { stdout } = useStdout();
   const { displayPages, lines, pageStarts } = useMemo(
@@ -124,6 +132,7 @@ export function App({ filename, pages }: AppProps): React.JSX.Element {
   const [pageValue, setPageValue] = useState('');
   const [activeQuery, setActiveQuery] = useState('');
   const [activeHitIndex, setActiveHitIndex] = useState(0);
+  const [selectedLinkIndex, setSelectedLinkIndex] = useState(0);
   const [awaitingSecondG, setAwaitingSecondG] = useState(false);
 
   const searchIndex = useMemo(() => createSearchIndex(lines), [lines]);
@@ -134,6 +143,7 @@ export function App({ filename, pages }: AppProps): React.JSX.Element {
   const currentHit = hits[activeHitIndex] ?? null;
   const currentHitLineIndex = currentHit?.lineIndex ?? null;
   const currentPage = displayPages[currentPageIndex] ?? { lines: [] };
+  const currentPageLinks = pages[currentPageIndex]?.links ?? [];
   const currentPageStart = pageStarts[currentPageIndex] ?? 0;
   const currentPageScrollOffset = pageScrollOffsets[currentPageIndex] ?? 0;
   const currentPageNumber = currentPageIndex + 1;
@@ -183,6 +193,16 @@ export function App({ filename, pages }: AppProps): React.JSX.Element {
     });
   }
 
+  function moveSelectedLink(delta: number): void {
+    setSelectedLinkIndex((current) => {
+      if (currentPageLinks.length === 0) {
+        return 0;
+      }
+
+      return clamp(current + delta, 0, currentPageLinks.length - 1);
+    });
+  }
+
   function submitSearch(value: string): void {
     setActiveQuery(value);
     setActiveHitIndex(0);
@@ -212,6 +232,12 @@ export function App({ filename, pages }: AppProps): React.JSX.Element {
       return changed ? nextOffsets : offsets;
     });
   }, [contentWidth, displayPages, visibleRowCount]);
+
+  useEffect(() => {
+    setSelectedLinkIndex((current) =>
+      clamp(current, 0, Math.max(0, currentPageLinks.length - 1)),
+    );
+  }, [currentPageLinks.length]);
 
   useEffect(() => {
     if (currentHitLineIndex !== null) {
@@ -283,6 +309,35 @@ export function App({ filename, pages }: AppProps): React.JSX.Element {
       return;
     }
 
+    if (mode === 'links') {
+      if (key.escape || input === 'l') {
+        setMode('normal');
+        return;
+      }
+
+      if (input === 'j') {
+        moveSelectedLink(1);
+        return;
+      }
+
+      if (input === 'k') {
+        moveSelectedLink(-1);
+        return;
+      }
+
+      if (key.return) {
+        const selectedLink = currentPageLinks[selectedLinkIndex];
+
+        if (selectedLink !== undefined) {
+          openUrl(selectedLink.url);
+        }
+
+        return;
+      }
+
+      return;
+    }
+
     if (input === 'q') {
       exit();
       return;
@@ -297,6 +352,13 @@ export function App({ filename, pages }: AppProps): React.JSX.Element {
     if (input === '/') {
       setSearchValue(activeQuery);
       setMode('search');
+      setAwaitingSecondG(false);
+      return;
+    }
+
+    if (input === 'l') {
+      setSelectedLinkIndex(0);
+      setMode('links');
       setAwaitingSecondG(false);
       return;
     }
@@ -386,6 +448,11 @@ export function App({ filename, pages }: AppProps): React.JSX.Element {
       <Box flexDirection="column" flexGrow={1}>
         {mode === 'help' ? (
           <HelpOverlay />
+        ) : mode === 'links' ? (
+          <LinkOverlay
+            links={currentPageLinks}
+            selectedIndex={selectedLinkIndex}
+          />
         ) : (
           <ResumeView
             contentWidth={contentWidth}
@@ -430,6 +497,10 @@ export function App({ filename, pages }: AppProps): React.JSX.Element {
           <Text dimColor>
             Enter jump to page · Esc cancel · range 1-{pageCount}
           </Text>
+        </Box>
+      ) : mode === 'links' ? (
+        <Box paddingX={1}>
+          <Text dimColor>j/k select · Enter open · Esc cancel</Text>
         </Box>
       ) : null}
     </Box>

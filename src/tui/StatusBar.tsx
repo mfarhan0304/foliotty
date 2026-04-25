@@ -5,7 +5,7 @@ type StatusBarProps = {
   currentLine: number;
   filename: string;
   hitCount: number;
-  mode: 'help' | 'normal' | 'page' | 'search';
+  mode: 'help' | 'links' | 'normal' | 'page' | 'search';
   page: number;
   pageCount: number;
   totalLines: number;
