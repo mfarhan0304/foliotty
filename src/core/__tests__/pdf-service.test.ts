@@ -87,16 +87,22 @@ describe('openPdf', () => {
     const document = await openPdf(filePath);
 
     assert.equal(document.numPages, 1);
+    const firstPage = document.pages[0];
+    assert.ok(firstPage);
+
     assert.deepEqual(
-      document.pages[0].map((item) => item.str),
+      firstPage.map((item) => item.str),
       ['Jane Doe', 'TypeScript Engineer'],
     );
-    assert.equal(typeof document.pages[0][0]?.fontName, 'string');
-    assert.equal(typeof document.pages[0][0]?.fontSize, 'number');
-    assert.equal(typeof document.pages[0][0]?.height, 'number');
-    assert.equal(typeof document.pages[0][0]?.width, 'number');
-    assert.equal(typeof document.pages[0][0]?.x, 'number');
-    assert.equal(typeof document.pages[0][0]?.y, 'number');
+
+    const firstItem = firstPage[0];
+    assert.ok(firstItem);
+    assert.equal(typeof firstItem.fontName, 'string');
+    assert.equal(typeof firstItem.fontSize, 'number');
+    assert.equal(typeof firstItem.height, 'number');
+    assert.equal(typeof firstItem.width, 'number');
+    assert.equal(typeof firstItem.x, 'number');
+    assert.equal(typeof firstItem.y, 'number');
   });
 
   test('throws when the PDF has no text layer', async () => {

@@ -43,6 +43,7 @@ const [filePath] = cli.input;
 
 if (!filePath) {
   cli.showHelp();
+  process.exit(0);
 }
 
 try {

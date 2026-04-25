@@ -182,12 +182,11 @@ export function detectColumns(items: TextItem[]): ColumnLayout {
 
   if (peaks.length <= 1) {
     const ordered = sortItemsTopToBottom(contentItems);
+    const firstColumnX = peaks[0] ?? ordered[0]?.x ?? 0;
 
     return {
       columns:
-        ordered.length === 0
-          ? []
-          : [{ x: peaks[0] ?? ordered[0].x, items: ordered }],
+        ordered.length === 0 ? [] : [{ x: firstColumnX, items: ordered }],
       spanningItems: [],
       droppedItems: [],
       orderedItems: ordered,
