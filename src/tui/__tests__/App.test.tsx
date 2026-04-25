@@ -80,13 +80,13 @@ describe('App', () => {
     );
 
     result.stdin.write('J');
-    await tick();
+    await tick(20);
     let frame = result.lastFrame() ?? '';
     assert.match(frame, /Page Two/);
     assert.match(frame, /page 2\/2/);
 
     result.stdin.write('K');
-    await tick();
+    await tick(20);
     frame = result.lastFrame() ?? '';
     assert.match(frame, /Page One/);
     assert.match(frame, /page 1\/2/);

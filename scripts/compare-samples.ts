@@ -218,9 +218,13 @@ async function comparePdf(
   await rm(workDirectory, { force: true, recursive: true });
   await execFileAsync('mkdir', ['-p', workDirectory]);
 
-  const foliottyRun = await execFileAsync('bun', ['run', 'src/cli.ts', pdfPath], {
-    cwd: process.cwd(),
-  }).catch((error: unknown) => {
+  const foliottyRun = await execFileAsync(
+    'bun',
+    ['run', 'src/cli.ts', pdfPath],
+    {
+      cwd: process.cwd(),
+    },
+  ).catch((error: unknown) => {
     const execError = error as {
       code?: number;
       stderr?: string;
@@ -255,7 +259,11 @@ async function comparePdf(
     foliottyNormalized.toLowerCase(),
     ocrNormalized.toLowerCase(),
   );
-  const maxLength = Math.max(foliottyNormalized.length, ocrNormalized.length, 1);
+  const maxLength = Math.max(
+    foliottyNormalized.length,
+    ocrNormalized.length,
+    1,
+  );
 
   return {
     file: pdfPath,
