@@ -111,4 +111,78 @@ describe('detectColumns', () => {
       ['Left Top', 'Left Bottom', 'Right Top', 'Right Bottom'],
     );
   });
+
+  test('keeps short right-aligned fragments inside the nearest column band', () => {
+    const layout = detectColumns([
+      createItem('Left Top', 72, 700),
+      createItem('Left Bottom', 72, 660),
+      createItem('Right Top', 320, 700),
+      createItem('Right Bottom', 320, 660),
+      createItem('doi:', 520, 640, 20),
+    ]);
+
+    assert.deepEqual(
+      layout.droppedItems.map((item) => item.str),
+      [],
+    );
+    assert.deepEqual(
+      layout.columns.map((column) => column.items.map((item) => item.str)),
+      [
+        ['Left Top', 'Left Bottom'],
+        ['Right Top', 'Right Bottom', 'doi:'],
+      ],
+    );
+  });
+
+  test('promotes centered academic title and author lines before two-column body', () => {
+    const layout = detectColumns([
+      createItem('A Short Paper Title', 190, 760, 180),
+      createItem('Jane Doe and John Smith', 205, 735, 150),
+      createItem('Left Body Top', 72, 690),
+      createItem('Left Body Bottom', 72, 650),
+      createItem('Right Body Top', 330, 690),
+      createItem('Right Body Bottom', 330, 650),
+    ]);
+
+    assert.deepEqual(
+      layout.spanningItems.map((item) => item.str),
+      ['A Short Paper Title', 'Jane Doe and John Smith'],
+    );
+    assert.deepEqual(
+      layout.orderedItems.map((item) => item.str),
+      [
+        'A Short Paper Title',
+        'Jane Doe and John Smith',
+        'Left Body Top',
+        'Left Body Bottom',
+        'Right Body Top',
+        'Right Body Bottom',
+      ],
+    );
+  });
+
+  test('promotes centered academic section lines after two-column body', () => {
+    const layout = detectColumns([
+      createItem('Left Body Top', 72, 700),
+      createItem('Left Body Bottom', 72, 660),
+      createItem('Right Body Top', 330, 700),
+      createItem('Right Body Bottom', 330, 660),
+      createItem('References', 245, 620, 100),
+    ]);
+
+    assert.deepEqual(
+      layout.spanningItems.map((item) => item.str),
+      ['References'],
+    );
+    assert.deepEqual(
+      layout.orderedItems.map((item) => item.str),
+      [
+        'Left Body Top',
+        'Left Body Bottom',
+        'Right Body Top',
+        'Right Body Bottom',
+        'References',
+      ],
+    );
+  });
 });

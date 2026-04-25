@@ -17,10 +17,18 @@ type HistogramBucket = {
   x: number;
 };
 
+type PageBounds = {
+  centerX: number;
+  maxX: number;
+  minX: number;
+  width: number;
+};
+
 const DEFAULT_BUCKET_SIZE = 20;
 const DEFAULT_MIN_PEAK_GAP = 80;
 const DEFAULT_SPAN_WIDTH_RATIO = 0.7;
 const DEFAULT_BOUNDARY_TOLERANCE_RATIO = 0.05;
+const DEFAULT_CENTERED_SPAN_TOLERANCE_RATIO = 0.25;
 
 function sortItemsTopToBottom(items: TextItem[]): TextItem[] {
   return [...items].sort((left, right) => {
@@ -32,9 +40,14 @@ function sortItemsTopToBottom(items: TextItem[]): TextItem[] {
   });
 }
 
-function estimatePageWidth(items: TextItem[]): number {
+function estimatePageBounds(items: TextItem[]): PageBounds {
   if (items.length === 0) {
-    return 0;
+    return {
+      centerX: 0,
+      maxX: 0,
+      minX: 0,
+      width: 0,
+    };
   }
 
   let minX = Number.POSITIVE_INFINITY;
@@ -45,7 +58,14 @@ function estimatePageWidth(items: TextItem[]): number {
     maxX = Math.max(maxX, item.x + item.width);
   }
 
-  return Math.max(0, maxX - minX);
+  const width = Math.max(0, maxX - minX);
+
+  return {
+    centerX: minX + width / 2,
+    maxX,
+    minX,
+    width,
+  };
 }
 
 function buildHistogram(
@@ -172,6 +192,113 @@ function partitionSpanningItems(
   };
 }
 
+function isCenteredSpanCandidate(
+  item: TextItem,
+  bounds: PageBounds,
+  peaks: number[],
+): boolean {
+  const [leftPeak, rightPeak] = peaks;
+
+  if (bounds.width === 0 || leftPeak === undefined || rightPeak === undefined) {
+    return false;
+  }
+
+  const itemCenter = item.x + item.width / 2;
+  const columnGap = Math.abs(rightPeak - leftPeak);
+  const startsBetweenColumns =
+    item.x > leftPeak + columnGap * DEFAULT_BOUNDARY_TOLERANCE_RATIO &&
+    item.x < rightPeak - columnGap * DEFAULT_BOUNDARY_TOLERANCE_RATIO;
+  const centerIsNearPageCenter =
+    Math.abs(itemCenter - bounds.centerX) <=
+    bounds.width * DEFAULT_CENTERED_SPAN_TOLERANCE_RATIO;
+
+  return startsBetweenColumns && centerIsNearPageCenter;
+}
+
+function promoteAcademicSpans(
+  columns: Column[],
+  droppedItems: TextItem[],
+  existingSpans: TextItem[],
+  bounds: PageBounds,
+  peaks: number[],
+): {
+  columns: Column[];
+  droppedItems: TextItem[];
+  spanningItems: TextItem[];
+} {
+  const columnItems = columns.flatMap((column) => column.items);
+  const centeredCandidates = new Set(
+    [...columnItems, ...droppedItems].filter((item) =>
+      isCenteredSpanCandidate(item, bounds, peaks),
+    ),
+  );
+  const bodyItems = columnItems.filter((item) => !centeredCandidates.has(item));
+
+  if (bodyItems.length === 0) {
+    return {
+      columns,
+      droppedItems,
+      spanningItems: existingSpans,
+    };
+  }
+
+  const columnYs = bodyItems.map((item) => item.y);
+  const maxColumnY = Math.max(...columnYs);
+  const minColumnY = Math.min(...columnYs);
+  const promotedItems = new Set<TextItem>();
+
+  for (const item of centeredCandidates) {
+    const outsideBody = item.y >= maxColumnY || item.y <= minColumnY;
+
+    if (outsideBody) {
+      promotedItems.add(item);
+    }
+  }
+
+  if (promotedItems.size === 0) {
+    return {
+      columns,
+      droppedItems,
+      spanningItems: existingSpans,
+    };
+  }
+
+  return {
+    columns: columns
+      .map((column) => ({
+        x: column.x,
+        items: column.items.filter((item) => !promotedItems.has(item)),
+      }))
+      .filter((column) => column.items.length > 0),
+    droppedItems: droppedItems.filter((item) => !promotedItems.has(item)),
+    spanningItems: [...existingSpans, ...promotedItems],
+  };
+}
+
+function isInsideColumnBand(
+  item: TextItem,
+  columnIndex: number,
+  peaks: number[],
+): boolean {
+  const [leftPeak, rightPeak] = peaks;
+
+  if (
+    leftPeak === undefined ||
+    rightPeak === undefined ||
+    peaks.length !== 2
+  ) {
+    return false;
+  }
+
+  const itemCenter = item.x + item.width / 2;
+  const columnGap = Math.abs(rightPeak - leftPeak);
+  const boundary = (leftPeak + rightPeak) / 2;
+  const minX = columnIndex === 0 ? leftPeak - columnGap : boundary;
+  const maxX = columnIndex === 0 ? boundary : rightPeak + columnGap;
+
+  return itemCenter >= minX && itemCenter <= maxX;
+}
+
 export function detectColumns(items: TextItem[]): ColumnLayout {
   const contentItems = items.filter((item) => item.str.trim().length > 0);
   const peaks = findColumnPeaks(
@@ -193,11 +320,11 @@ export function detectColumns(items: TextItem[]): ColumnLayout {
     };
   }
 
-  const pageWidth = estimatePageWidth(contentItems);
-  const spanThreshold = pageWidth * DEFAULT_SPAN_WIDTH_RATIO;
+  const pageBounds = estimatePageBounds(contentItems);
+  const spanThreshold = pageBounds.width * DEFAULT_SPAN_WIDTH_RATIO;
 
   const spanningItems =
-    pageWidth === 0
+    pageBounds.width === 0
       ? []
       : contentItems.filter((item) => item.width >= spanThreshold);
   const candidateItems = contentItems.filter(
@@ -228,11 +355,14 @@ export function detectColumns(items: TextItem[]): ColumnLayout {
 
     const localGap = nextNearest
       ? Math.abs(peaks[nextNearest.index]! - peaks[nearest.index]!)
-      : pageWidth;
+      : pageBounds.width;
     const maxDistance =
       localGap / 2 + localGap * DEFAULT_BOUNDARY_TOLERANCE_RATIO;
 
-    if (nearest.distance > maxDistance) {
+    if (
+      nearest.distance > maxDistance &&
+      !isInsideColumnBand(item, nearest.index, peaks)
+    ) {
       droppedItems.push(item);
       continue;
     }
@@ -240,16 +370,27 @@ export function detectColumns(items: TextItem[]): ColumnLayout {
     columns[nearest.index]?.items.push(item);
   }
 
-  const orderedColumns = columns
+  const initialOrderedColumns = columns
     .map((column) => ({
       x: column.x,
       items: sortItemsTopToBottom(column.items),
     }))
     .filter((column) => column.items.length > 0);
 
+  const promotedLayout = promoteAcademicSpans(
+    initialOrderedColumns,
+    droppedItems,
+    spanningItems,
+    pageBounds,
+    peaks,
+  );
+  const orderedColumns = promotedLayout.columns;
+  const promotedSpanningItems = promotedLayout.spanningItems;
+  const promotedDroppedItems = promotedLayout.droppedItems;
+
   const allColumnItems = orderedColumns.flatMap((column) => column.items);
   const { headerItems, footerItems, middleItems } = partitionSpanningItems(
-    spanningItems,
+    promotedSpanningItems,
     allColumnItems,
   );
   const orderedItems = [
@@ -261,8 +402,8 @@ export function detectColumns(items: TextItem[]): ColumnLayout {
 
   return {
     columns: orderedColumns,
-    spanningItems: sortItemsTopToBottom(spanningItems),
-    droppedItems: sortItemsTopToBottom(droppedItems),
+    spanningItems: sortItemsTopToBottom(promotedSpanningItems),
+    droppedItems: sortItemsTopToBottom(promotedDroppedItems),
     orderedItems,
   };
 }
