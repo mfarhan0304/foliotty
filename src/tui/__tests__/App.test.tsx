@@ -93,7 +93,7 @@ describe('App', () => {
     assert.doesNotMatch(frame, /Text Mode/);
   });
 
-  test('keeps two-page preview spread on the current page pair', async () => {
+  test('keeps preview on the current raster page', async () => {
     const result = render(
       <App
         filename="resume.pdf"

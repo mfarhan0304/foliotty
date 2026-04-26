@@ -159,7 +159,7 @@ export function App({
   const currentPageLinks = pages[currentPageIndex]?.links ?? [];
   const currentPreviewPages = previewPages.slice(
     currentPageIndex,
-    currentPageIndex + 2,
+    currentPageIndex + 1,
   );
   const currentPageStart = pageStarts[currentPageIndex] ?? 0;
   const currentPageScrollOffset = pageScrollOffsets[currentPageIndex] ?? 0;
