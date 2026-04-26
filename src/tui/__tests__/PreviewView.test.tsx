@@ -32,14 +32,14 @@ describe('renderInlinePreviewImage', () => {
   test('renders Kitty inline PNG escape sequence', () => {
     assert.equal(
       renderInlinePreviewImage(createRasterPage(), 'kitty'),
-      '\u001B_Ga=T,f=100;cG5n\u001B\\',
+      '\u001B[2J\u001B[3J\u001B[H\u001B_Ga=d,d=A\u001B\\\u001B_Ga=T,f=100;cG5n\u001B\\',
     );
   });
 
   test('renders iTerm inline PNG escape sequence', () => {
     assert.equal(
       renderInlinePreviewImage(createRasterPage(), 'iterm'),
-      '\u001B]1337;File=inline=1;width=auto;height=auto:cG5n\u0007',
+      '\u001B[2J\u001B[3J\u001B[H\u001B]1337;File=inline=1;width=1px;height=1px:cG5n\u0007',
     );
   });
 

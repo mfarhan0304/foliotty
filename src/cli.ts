@@ -62,7 +62,7 @@ try {
 
   if (process.stdout.isTTY && process.stdin.isTTY) {
     const graphicsCapability = detectGraphicsCapability();
-    const previewHeight = Math.max(240, ((process.stdout.rows ?? 24) - 4) * 18);
+    const previewHeight = Math.max(360, ((process.stdout.rows ?? 24) - 4) * 24);
     const previewPageWidth = Math.floor((previewHeight * 8.5) / 11);
     const renderHighlightedPreviewPage = async (
       pageIndex: number,
