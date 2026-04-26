@@ -78,6 +78,27 @@ describe('renderPdfPageToPng', () => {
     );
   });
 
+  test('keeps display dimensions separate from rendered pixel dimensions', async () => {
+    tempDirectory = await mkdtemp(join(tmpdir(), 'foliotty-raster-'));
+    const filePath = join(tempDirectory, 'simple.pdf');
+    await writeFile(filePath, createTextPdf('Preview'));
+
+    const page = await renderPdfPageToPng(filePath, {
+      displayColumns: 30,
+      displayHeight: 198,
+      displayRows: 9,
+      displayWidth: 153,
+      width: 306,
+    });
+
+    assert.equal(page.width, 306);
+    assert.equal(page.height, 396);
+    assert.equal(page.displayWidth, 153);
+    assert.equal(page.displayHeight, 198);
+    assert.equal(page.displayColumns, 30);
+    assert.equal(page.displayRows, 9);
+  });
+
   test('draws highlight rectangles over the rendered page', async () => {
     tempDirectory = await mkdtemp(join(tmpdir(), 'foliotty-raster-'));
     const filePath = join(tempDirectory, 'simple.pdf');

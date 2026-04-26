@@ -32,6 +32,39 @@ function renderLinks(links: PdfLink[]): string {
   ].join('\n');
 }
 
+type PreviewFit = {
+  displayColumns: number;
+  displayHeight: number;
+  displayRows: number;
+  displayWidth: number;
+  renderWidth: number;
+};
+
+const PDF_PAGE_ASPECT_RATIO = 8.5 / 11;
+const PREVIEW_CELL_HEIGHT = 24;
+const PREVIEW_CELL_WIDTH = 10;
+const PREVIEW_RENDER_SCALE = 2;
+
+function fitPreviewToTerminal(columns = 80, rows = 24): PreviewFit {
+  const usableColumns = Math.max(20, columns - 2);
+  const usableRows = Math.max(8, rows - 4);
+  const maxDisplayWidth = usableColumns * PREVIEW_CELL_WIDTH;
+  const maxDisplayHeight = usableRows * PREVIEW_CELL_HEIGHT;
+  const widthConstrainedHeight = Math.floor(
+    maxDisplayWidth / PDF_PAGE_ASPECT_RATIO,
+  );
+  const displayHeight = Math.min(maxDisplayHeight, widthConstrainedHeight);
+  const displayWidth = Math.floor(displayHeight * PDF_PAGE_ASPECT_RATIO);
+
+  return {
+    displayColumns: Math.ceil(displayWidth / PREVIEW_CELL_WIDTH),
+    displayHeight,
+    displayRows: Math.ceil(displayHeight / PREVIEW_CELL_HEIGHT),
+    displayWidth,
+    renderWidth: displayWidth * PREVIEW_RENDER_SCALE,
+  };
+}
+
 const cli = meow(
   `
     Usage
@@ -62,25 +95,35 @@ try {
 
   if (process.stdout.isTTY && process.stdin.isTTY) {
     const graphicsCapability = detectGraphicsCapability();
-    const previewHeight = Math.max(360, ((process.stdout.rows ?? 24) - 4) * 24);
-    const previewPageWidth = Math.floor((previewHeight * 8.5) / 11);
+    const previewFit = fitPreviewToTerminal(
+      process.stdout.columns,
+      process.stdout.rows,
+    );
     const renderHighlightedPreviewPage = async (
       pageIndex: number,
       query: string,
     ) =>
       renderPdfPageToPng(filePath, {
+        displayColumns: previewFit.displayColumns,
+        displayHeight: previewFit.displayHeight,
+        displayRows: previewFit.displayRows,
+        displayWidth: previewFit.displayWidth,
         highlights: searchTextItems(document.pages, query)
           .filter((hit) => hit.pageIndex === pageIndex)
           .flatMap((hit) => hit.rects),
         pageNumber: pageIndex + 1,
-        width: previewPageWidth,
+        width: previewFit.renderWidth,
       });
     const previewPages = supportsInlinePreview(graphicsCapability)
       ? await Promise.all(
           Array.from({ length: document.numPages }, (_, index) =>
             renderPdfPageToPng(filePath, {
+              displayColumns: previewFit.displayColumns,
+              displayHeight: previewFit.displayHeight,
+              displayRows: previewFit.displayRows,
+              displayWidth: previewFit.displayWidth,
               pageNumber: index + 1,
-              width: previewPageWidth,
+              width: previewFit.renderWidth,
             }),
           ),
         ).catch((error: unknown) => {

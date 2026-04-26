@@ -16,6 +16,19 @@ function createRasterPage(content = 'png'): RasterPage {
   };
 }
 
+function createDisplayedRasterPage(): RasterPage {
+  return {
+    displayColumns: 10,
+    displayHeight: 50,
+    displayRows: 5,
+    displayWidth: 40,
+    height: 100,
+    pageNumber: 1,
+    png: Buffer.from('png'),
+    width: 80,
+  };
+}
+
 describe('supportsInlinePreview', () => {
   test('supports Kitty and iTerm inline image protocols', () => {
     assert.equal(supportsInlinePreview('kitty'), true);
@@ -40,6 +53,17 @@ describe('renderInlinePreviewImage', () => {
     assert.equal(
       renderInlinePreviewImage(createRasterPage(), 'iterm'),
       '\u001B[2J\u001B[3J\u001B[H\u001B]1337;File=inline=1;width=1px;height=1px:cG5n\u0007',
+    );
+  });
+
+  test('uses explicit display dimensions when available', () => {
+    assert.equal(
+      renderInlinePreviewImage(createDisplayedRasterPage(), 'iterm'),
+      '\u001B[2J\u001B[3J\u001B[H\u001B]1337;File=inline=1;width=40px;height=50px:cG5n\u0007',
+    );
+    assert.equal(
+      renderInlinePreviewImage(createDisplayedRasterPage(), 'kitty'),
+      '\u001B[2J\u001B[3J\u001B[H\u001B_Ga=d,d=A\u001B\\\u001B_Ga=T,f=100,c=10,r=5;cG5n\u001B\\',
     );
   });
 

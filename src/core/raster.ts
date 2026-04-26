@@ -15,6 +15,10 @@ export type CanvasBackend = {
 };
 
 export type RasterPage = {
+  displayColumns?: number;
+  displayHeight?: number;
+  displayRows?: number;
+  displayWidth?: number;
   height: number;
   pageNumber: number;
   png: Buffer;
@@ -30,6 +34,10 @@ export type HighlightRect = {
 
 export type RenderPdfPageOptions = {
   canvasBackend?: CanvasBackend;
+  displayColumns?: number;
+  displayHeight?: number;
+  displayRows?: number;
+  displayWidth?: number;
   highlights?: HighlightRect[];
   pageNumber?: number;
   scale?: number;
@@ -116,6 +124,10 @@ export async function renderPdfPageToPng(
   filePath: string,
   {
     canvasBackend,
+    displayColumns,
+    displayHeight,
+    displayRows,
+    displayWidth,
     highlights = [],
     pageNumber = 1,
     scale = 1,
@@ -158,12 +170,30 @@ export async function renderPdfPageToPng(
       }
     }
 
-    return {
+    const rasterPage: RasterPage = {
       height: canvasHeight,
       pageNumber,
       png: canvas.toBuffer('image/png'),
       width: canvasWidth,
     };
+
+    if (displayColumns !== undefined) {
+      rasterPage.displayColumns = displayColumns;
+    }
+
+    if (displayHeight !== undefined) {
+      rasterPage.displayHeight = displayHeight;
+    }
+
+    if (displayRows !== undefined) {
+      rasterPage.displayRows = displayRows;
+    }
+
+    if (displayWidth !== undefined) {
+      rasterPage.displayWidth = displayWidth;
+    }
+
+    return rasterPage;
   } finally {
     await document?.destroy();
   }

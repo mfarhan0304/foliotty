@@ -24,12 +24,19 @@ export function renderInlinePreviewImage(
   }
 
   const payload = page.png.toString('base64');
+  const displayWidth = page.displayWidth ?? page.width;
+  const displayHeight = page.displayHeight ?? page.height;
 
   if (capability === 'kitty') {
-    return `\u001B[2J\u001B[3J\u001B[H\u001B_Ga=d,d=A\u001B\\\u001B_Ga=T,f=100;${payload}\u001B\\`;
+    const placement =
+      page.displayColumns === undefined || page.displayRows === undefined
+        ? ''
+        : `,c=${page.displayColumns},r=${page.displayRows}`;
+
+    return `\u001B[2J\u001B[3J\u001B[H\u001B_Ga=d,d=A\u001B\\\u001B_Ga=T,f=100${placement};${payload}\u001B\\`;
   }
 
-  return `\u001B[2J\u001B[3J\u001B[H\u001B]1337;File=inline=1;width=${page.width}px;height=${page.height}px:${payload}\u0007`;
+  return `\u001B[2J\u001B[3J\u001B[H\u001B]1337;File=inline=1;width=${displayWidth}px;height=${displayHeight}px:${payload}\u0007`;
 }
 
 export function PreviewView({
