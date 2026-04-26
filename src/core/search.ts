@@ -1,4 +1,5 @@
 import type { StyledLine } from './structure.js';
+import type { TextItem } from './pdf-service.js';
 
 export type SearchHit = {
   lineIndex: number;
@@ -9,6 +10,18 @@ export type SearchIndex = {
   indexedLineCount: number;
   normalizedLines: Map<number, string>;
   trigrams: Map<string, Set<number>>;
+};
+
+export type SearchRect = {
+  height: number;
+  width: number;
+  x: number;
+  y: number;
+};
+
+export type PageSearchHit = {
+  pageIndex: number;
+  rects: SearchRect[];
 };
 
 function stripPrivateUse(text: string): string {
@@ -155,6 +168,47 @@ export function searchIndexedLines(
       hits.push({
         lineIndex,
         ranges,
+      });
+    }
+  }
+
+  return hits;
+}
+
+export function searchTextItems(
+  pages: TextItem[][],
+  query: string,
+): PageSearchHit[] {
+  const normalizedQuery = normalizeSearchText(query).trim();
+
+  if (normalizedQuery.length === 0) {
+    return [];
+  }
+
+  const hits: PageSearchHit[] = [];
+
+  for (const [pageIndex, pageItems] of pages.entries()) {
+    for (const item of pageItems) {
+      const normalizedText = normalizeSearchText(item.str);
+      const ranges = rangesForLine(normalizedText, normalizedQuery);
+
+      if (ranges.length === 0) {
+        continue;
+      }
+
+      hits.push({
+        pageIndex,
+        rects: ranges.map((range) => {
+          const startRatio = range.start / Math.max(1, normalizedText.length);
+          const endRatio = range.end / Math.max(1, normalizedText.length);
+
+          return {
+            height: item.height,
+            width: item.width * (endRatio - startRatio),
+            x: item.x + item.width * startRatio,
+            y: item.y,
+          };
+        }),
       });
     }
   }

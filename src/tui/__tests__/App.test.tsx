@@ -3,7 +3,7 @@ import { afterEach, describe, test } from 'node:test';
 
 import { cleanup, render } from 'ink-testing-library';
 
-import type { PdfLink } from '../../core/pdf-service.js';
+import type { PdfLink, TextItem } from '../../core/pdf-service.js';
 import type { RasterPage } from '../../core/raster.js';
 import type { StyledLine } from '../../core/structure.js';
 import { App } from '../App.js';
@@ -40,6 +40,18 @@ function createRasterPage(): RasterPage {
     pageNumber: 1,
     png: Buffer.from('png'),
     width: 1,
+  };
+}
+
+function createTextItem(str: string): TextItem {
+  return {
+    fontName: 'Helvetica',
+    fontSize: 10,
+    height: 10,
+    str,
+    width: str.length * 10,
+    x: 0,
+    y: 0,
   };
 }
 
@@ -140,6 +152,41 @@ describe('App', () => {
     const frame = result.lastFrame() ?? '';
     assert.match(frame, /Text Mode/);
     assert.match(frame, /text/);
+  });
+
+  test('searches preview mode with highlighted raster rendering', async () => {
+    const renderedPages: Array<{ pageIndex: number; query: string }> = [];
+    const result = render(
+      <App
+        filename="resume.pdf"
+        graphicsCapability="kitty"
+        pages={[
+          {
+            lines: [createLine('Find me')],
+            links: [],
+          },
+        ]}
+        previewPages={[createRasterPage()]}
+        renderHighlightedPreviewPage={async (pageIndex, query) => {
+          renderedPages.push({ pageIndex, query });
+          return {
+            ...createRasterPage(),
+            png: Buffer.from('highlighted'),
+          };
+        }}
+        textPages={[[createTextItem('Find me')]]}
+      />,
+    );
+
+    result.stdin.write('/');
+    await tick(20);
+    result.stdin.write('Find');
+    await tick(20);
+    result.stdin.write('\r');
+    await tick(30);
+
+    assert.deepEqual(renderedPages, [{ pageIndex: 0, query: 'Find' }]);
+    assert.match(result.lastFrame() ?? '', /preview/);
   });
 
   test('turns pages with J for previous and K for next', async () => {

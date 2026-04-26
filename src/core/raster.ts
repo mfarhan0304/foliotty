@@ -21,16 +21,29 @@ export type RasterPage = {
   width: number;
 };
 
+export type HighlightRect = {
+  height: number;
+  width: number;
+  x: number;
+  y: number;
+};
+
 export type RenderPdfPageOptions = {
   canvasBackend?: CanvasBackend;
+  highlights?: HighlightRect[];
   pageNumber?: number;
   scale?: number;
   width?: number;
 };
 
 type CanvasLike = {
-  getContext: (contextType: '2d') => unknown;
+  getContext: (contextType: '2d') => CanvasContextLike;
   toBuffer: (mimeType: 'image/png') => Buffer;
+};
+
+type CanvasContextLike = {
+  fillRect: (x: number, y: number, width: number, height: number) => void;
+  fillStyle: string;
 };
 
 export class RasterBackendUnavailableError extends Error {
@@ -103,6 +116,7 @@ export async function renderPdfPageToPng(
   filePath: string,
   {
     canvasBackend,
+    highlights = [],
     pageNumber = 1,
     scale = 1,
     width,
@@ -130,6 +144,19 @@ export async function renderPdfPageToPng(
       canvasContext: canvasContext as CanvasRenderingContext2D,
       viewport,
     }).promise;
+
+    if (highlights.length > 0) {
+      canvasContext.fillStyle = 'rgba(255, 230, 0, 0.45)';
+
+      for (const rect of highlights) {
+        canvasContext.fillRect(
+          rect.x * resolvedScale,
+          viewport.height - (rect.y + rect.height) * resolvedScale,
+          rect.width * resolvedScale,
+          rect.height * resolvedScale,
+        );
+      }
+    }
 
     return {
       height: canvasHeight,

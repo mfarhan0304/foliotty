@@ -1,9 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Box, Text, useApp, useInput, useStdout } from 'ink';
 
-import type { PdfLink } from '../core/pdf-service.js';
+import type { PdfLink, TextItem } from '../core/pdf-service.js';
 import type { RasterPage } from '../core/raster.js';
-import { createSearchIndex, searchIndexedLines } from '../core/search.js';
+import {
+  createSearchIndex,
+  searchIndexedLines,
+  searchTextItems,
+} from '../core/search.js';
 import type { StyledLine } from '../core/structure.js';
 import { HelpOverlay } from './HelpOverlay.js';
 import { LinkOverlay } from './LinkOverlay.js';
@@ -31,6 +35,11 @@ type AppProps = {
   openUrl?: OpenUrl;
   pages: PageBundle[];
   previewPages?: RasterPage[];
+  renderHighlightedPreviewPage?: (
+    pageIndex: number,
+    query: string,
+  ) => Promise<RasterPage>;
+  textPages?: TextItem[][];
 };
 
 type DisplayMode = 'preview' | 'text';
@@ -39,6 +48,9 @@ type Mode = 'help' | 'links' | 'normal' | 'page' | 'search';
 type DisplayPage = {
   lines: StyledLine[];
 };
+
+const EMPTY_RASTER_PAGES: RasterPage[] = [];
+const EMPTY_TEXT_PAGES: TextItem[][] = [];
 
 type FlattenedDocument = {
   displayPages: DisplayPage[];
@@ -121,7 +133,9 @@ export function App({
   graphicsCapability = 'none',
   openUrl = defaultOpenUrl,
   pages,
-  previewPages = [],
+  previewPages = EMPTY_RASTER_PAGES,
+  renderHighlightedPreviewPage,
+  textPages = EMPTY_TEXT_PAGES,
 }: AppProps): React.JSX.Element {
   const { exit } = useApp();
   const { stdout } = useStdout();
@@ -131,8 +145,12 @@ export function App({
   );
   const contentWidth = Math.max(20, (stdout.columns ?? 80) - 2);
   const visibleRowCount = Math.max(1, (stdout.rows ?? 24) - 4);
+  const [highlightedPreviewPages, setHighlightedPreviewPages] =
+    useState<RasterPage[]>(previewPages);
+  const activePreviewPages =
+    highlightedPreviewPages.length > 0 ? highlightedPreviewPages : previewPages;
   const previewAvailable =
-    previewPages.length > 0 && supportsInlinePreview(graphicsCapability);
+    activePreviewPages.length > 0 && supportsInlinePreview(graphicsCapability);
   const [displayMode, setDisplayMode] = useState<DisplayMode>(
     previewAvailable ? 'preview' : 'text',
   );
@@ -157,7 +175,7 @@ export function App({
   const currentHitLineIndex = currentHit?.lineIndex ?? null;
   const currentPage = displayPages[currentPageIndex] ?? { lines: [] };
   const currentPageLinks = pages[currentPageIndex]?.links ?? [];
-  const currentPreviewPages = previewPages.slice(
+  const currentPreviewPages = activePreviewPages.slice(
     currentPageIndex,
     currentPageIndex + 1,
   );
@@ -226,6 +244,37 @@ export function App({
     setMode('normal');
   }
 
+  async function submitPreviewSearch(value: string): Promise<void> {
+    setActiveQuery(value);
+    setActiveHitIndex(0);
+    setMode('normal');
+
+    if (renderHighlightedPreviewPage === undefined) {
+      return;
+    }
+
+    const [firstHit] = searchTextItems(textPages, value);
+
+    if (firstHit === undefined) {
+      setHighlightedPreviewPages(previewPages);
+      return;
+    }
+
+    moveToPage(firstHit.pageIndex);
+
+    const highlightedPage = await renderHighlightedPreviewPage(
+      firstHit.pageIndex,
+      value,
+    );
+
+    setHighlightedPreviewPages((currentPages) => {
+      const nextPages =
+        currentPages.length > 0 ? [...currentPages] : [...previewPages];
+      nextPages[firstHit.pageIndex] = highlightedPage;
+      return nextPages;
+    });
+  }
+
   function submitPageJump(value: string): void {
     const parsed = Number.parseInt(value, 10);
 
@@ -255,6 +304,10 @@ export function App({
       setDisplayMode('text');
     }
   }, [displayMode, previewAvailable]);
+
+  useEffect(() => {
+    setHighlightedPreviewPages(previewPages);
+  }, [previewPages]);
 
   useEffect(() => {
     setSelectedLinkIndex((current) =>
@@ -374,7 +427,6 @@ export function App({
 
     if (input === '/') {
       setSearchValue(activeQuery);
-      setDisplayMode('text');
       setMode('search');
       setAwaitingSecondG(false);
       return;
@@ -505,7 +557,14 @@ export function App({
         <SearchPrompt
           value={searchValue}
           onChange={setSearchValue}
-          onSubmit={submitSearch}
+          onSubmit={(value) => {
+            if (displayMode === 'preview') {
+              void submitPreviewSearch(value);
+              return;
+            }
+
+            submitSearch(value);
+          }}
         />
       ) : mode === 'page' ? (
         <SearchPrompt

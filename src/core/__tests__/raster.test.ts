@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { afterEach, describe, test } from 'node:test';
 
 import { renderPdfPageToPng } from '../raster.js';
+import type { CanvasBackend } from '../raster.js';
 
 function createPdf(objects: string[]): Uint8Array {
   let pdf = '%PDF-1.4\n';
@@ -75,5 +76,49 @@ describe('renderPdfPageToPng', () => {
       [...page.png.subarray(0, 8)],
       [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
     );
+  });
+
+  test('draws highlight rectangles over the rendered page', async () => {
+    tempDirectory = await mkdtemp(join(tmpdir(), 'foliotty-raster-'));
+    const filePath = join(tempDirectory, 'simple.pdf');
+    const fillRects: number[][] = [];
+    await writeFile(filePath, createTextPdf('Preview'));
+    const context = new Proxy(
+      {
+        canvas: { height: 396, width: 306 },
+        fillRect: (...args: number[]) => fillRects.push(args),
+        fillStyle: '',
+        getTransform: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }),
+        measureText: () => ({ width: 0 }),
+      },
+      {
+        get(target, property) {
+          if (property in target) {
+            return target[property as keyof typeof target];
+          }
+
+          return () => undefined;
+        },
+        set(target, property, value) {
+          target[property as keyof typeof target] = value as never;
+          return true;
+        },
+      },
+    );
+
+    const canvasBackend: CanvasBackend = {
+      createCanvas: () => ({
+        getContext: () => context,
+        toBuffer: () => Buffer.from('png'),
+      }),
+    };
+
+    await renderPdfPageToPng(filePath, {
+      canvasBackend,
+      highlights: [{ height: 10, width: 20, x: 72, y: 720 }],
+      width: 306,
+    });
+
+    assert.deepEqual(fillRects.at(-1), [36, 31, 10, 5]);
   });
 });

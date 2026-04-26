@@ -14,6 +14,7 @@ import {
   RasterBackendUnavailableError,
   renderPdfPageToPng,
 } from './core/raster.js';
+import { searchTextItems } from './core/search.js';
 import { buildStyledLines } from './core/structure.js';
 import { App } from './tui/App.js';
 import { detectGraphicsCapability } from './tui/graphics.js';
@@ -63,6 +64,17 @@ try {
     const graphicsCapability = detectGraphicsCapability();
     const previewHeight = Math.max(240, ((process.stdout.rows ?? 24) - 4) * 18);
     const previewPageWidth = Math.floor((previewHeight * 8.5) / 11);
+    const renderHighlightedPreviewPage = async (
+      pageIndex: number,
+      query: string,
+    ) =>
+      renderPdfPageToPng(filePath, {
+        highlights: searchTextItems(document.pages, query)
+          .filter((hit) => hit.pageIndex === pageIndex)
+          .flatMap((hit) => hit.rects),
+        pageNumber: pageIndex + 1,
+        width: previewPageWidth,
+      });
     const previewPages = supportsInlinePreview(graphicsCapability)
       ? await Promise.all(
           Array.from({ length: document.numPages }, (_, index) =>
@@ -88,6 +100,8 @@ try {
         graphicsCapability,
         pages,
         previewPages,
+        renderHighlightedPreviewPage,
+        textPages: document.pages,
       }),
     );
 

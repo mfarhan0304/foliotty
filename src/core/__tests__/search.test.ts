@@ -6,8 +6,10 @@ import {
   normalizeSearchText,
   searchIndexedLines,
   searchStyledLines,
+  searchTextItems,
 } from '../search.js';
 import type { StyledLine } from '../structure.js';
+import type { TextItem } from '../pdf-service.js';
 
 function createLine(
   text: string,
@@ -17,6 +19,18 @@ function createLine(
     kind,
     runs: text.length === 0 ? [] : [{ bold: false, italic: false, text }],
     text,
+  };
+}
+
+function createItem(str: string, x = 10, y = 20, width = 80): TextItem {
+  return {
+    fontName: 'Body',
+    fontSize: 10,
+    height: 10,
+    str,
+    width,
+    x,
+    y,
   };
 }
 
@@ -120,5 +134,27 @@ describe('searchIndexedLines', () => {
     ]);
 
     assert.equal(index.indexedLineCount, 1);
+  });
+});
+
+describe('searchTextItems', () => {
+  test('returns page-local rectangles for raw text item hits', () => {
+    assert.deepEqual(searchTextItems([[createItem('hello world')]], 'world'), [
+      {
+        pageIndex: 0,
+        rects: [
+          {
+            height: 10,
+            width: (80 * 5) / 11,
+            x: (80 * 6) / 11 + 10,
+            y: 20,
+          },
+        ],
+      },
+    ]);
+  });
+
+  test('returns no hits for an empty query', () => {
+    assert.deepEqual(searchTextItems([[createItem('hello')]], '  '), []);
   });
 });
