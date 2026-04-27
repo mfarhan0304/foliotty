@@ -32,8 +32,8 @@ export function StatusBar({
       : `hit ${activeHitOrdinal}/${hitCount}`;
 
   return (
-    <Box borderStyle="single" paddingX={1}>
-      <Text>
+    <Box paddingX={1}>
+      <Text inverse>
         {filename} · line {Math.min(currentLine + 1, totalLines)}/{totalLines} ·
         page {page}/{pageCount} · {displayMode} · {mode} · {hitStatus}
         {activity === undefined ? '' : ` · ${activity}`}

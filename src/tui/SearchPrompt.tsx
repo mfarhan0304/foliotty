@@ -21,7 +21,7 @@ export function SearchPrompt({
       : { value, onChange, onSubmit };
 
   return (
-    <Box borderStyle="single" paddingX={1}>
+    <Box paddingX={1}>
       <Text>{label}</Text>
       <TextInput {...inputProps} />
     </Box>

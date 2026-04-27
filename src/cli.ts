@@ -153,7 +153,11 @@ try {
         renderPreviewPage,
         textPages: document.pages,
       }),
-      { incrementalRendering: true },
+      // Standard log-update (eraseLines + rewrite) avoids the cursor-tracking
+      // drift that incremental rendering exhibits when our side-channel image
+      // emit moves the cursor mid-frame. Image is re-emitted via PreviewView's
+      // useEffect on every relevant render to stay visible.
+      { incrementalRendering: false },
     );
 
     try {

@@ -61,11 +61,11 @@ export function PreviewView({
   const reservedRows = currentPage?.displayRows ?? 0;
   const lastRenderedPage = useRef<RasterPage | null>(null);
 
-  // Re-emit the image after every render. ink's fullscreen branch writes
-  // clearTerminal each render (when chrome fills the terminal), which wipes
-  // the previous image. We also schedule a delayed re-emit because ink throttles
-  // its onRender (default ~33ms trailing edge) and the trailing write fires
-  // *after* this effect, wiping the image we just placed; the timer catches it.
+  // Re-emit on every render. Standard log-update writes eraseLines+content
+  // each render which wipes the image cells, so we need to redraw after every
+  // ink commit. DECSC/DECRC keeps ink's cursor expectations intact, and the
+  // delayed follow-up catches ink's throttled trailing render that fires after
+  // this effect.
   useEffect(() => {
     if (currentPage === undefined) {
       return;
@@ -78,8 +78,6 @@ export function PreviewView({
       return;
     }
 
-    // Wrap the image emit in DECSC/DECRC so the terminal cursor lands back
-    // exactly where ink left it.
     const wrapped = `7${escape}8`;
     stdout.write(wrapped);
     lastRenderedPage.current = currentPage;
