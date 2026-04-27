@@ -192,24 +192,22 @@ export function searchTextItems(
       const normalizedText = normalizeSearchText(item.str);
       const ranges = rangesForLine(normalizedText, normalizedQuery);
 
-      if (ranges.length === 0) {
-        continue;
+      for (const range of ranges) {
+        const startRatio = range.start / Math.max(1, normalizedText.length);
+        const endRatio = range.end / Math.max(1, normalizedText.length);
+
+        hits.push({
+          pageIndex,
+          rects: [
+            {
+              height: item.height,
+              width: item.width * (endRatio - startRatio),
+              x: item.x + item.width * startRatio,
+              y: item.y,
+            },
+          ],
+        });
       }
-
-      hits.push({
-        pageIndex,
-        rects: ranges.map((range) => {
-          const startRatio = range.start / Math.max(1, normalizedText.length);
-          const endRatio = range.end / Math.max(1, normalizedText.length);
-
-          return {
-            height: item.height,
-            width: item.width * (endRatio - startRatio),
-            x: item.x + item.width * startRatio,
-            y: item.y,
-          };
-        }),
-      });
     }
   }
 
