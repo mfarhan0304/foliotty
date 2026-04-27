@@ -27,7 +27,7 @@ export function LinkOverlay({
         links.map((link, index) => (
           <Text key={`${link.url}:${index}`}>
             {selectedIndex === index ? '> ' : '  '}
-            {index + 1}. {link.text} -&gt; {link.url}
+            {index + 1}. {link.url}
           </Text>
         ))
       )}

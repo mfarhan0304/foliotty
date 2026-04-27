@@ -62,9 +62,30 @@ type FlattenedDocument = {
   pageStarts: number[];
 };
 
+function dedupeLinksByUrl(links: PdfLink[]): PdfLink[] {
+  const seen = new Set<string>();
+  const result: PdfLink[] = [];
+
+  // PDFs hyphenate long URLs across visual lines, which makes pdfjs return
+  // one annotation per fragment ("…erm2-" + "nwe9") all pointing at the same
+  // destination. Keep the first occurrence so the user sees one link per URL.
+  for (const link of links) {
+    if (seen.has(link.url)) {
+      continue;
+    }
+
+    seen.add(link.url);
+    result.push(link);
+  }
+
+  return result;
+}
+
 function toDisplayPages(pages: PageBundle[]): DisplayPage[] {
   return pages.map((page) => {
-    if (page.links.length === 0) {
+    const uniqueLinks = dedupeLinksByUrl(page.links);
+
+    if (uniqueLinks.length === 0) {
       return { lines: page.lines };
     }
 
@@ -77,16 +98,16 @@ function toDisplayPages(pages: PageBundle[]): DisplayPage[] {
           runs: [{ bold: true, italic: false, text: 'Links' }],
           text: 'Links',
         },
-        ...page.links.map((link) => ({
+        ...uniqueLinks.map((link) => ({
           kind: 'bullet' as const,
           runs: [
             {
               bold: false,
               italic: false,
-              text: `  • ${link.text} -> ${link.url}`,
+              text: `  • ${link.url}`,
             },
           ],
-          text: `  • ${link.text} -> ${link.url}`,
+          text: `  • ${link.url}`,
         })),
       ],
     };
@@ -194,7 +215,10 @@ export function App({
   const currentHit = hits[activeHitIndex] ?? null;
   const currentHitLineIndex = currentHit?.lineIndex ?? null;
   const currentPage = displayPages[currentPageIndex] ?? { lines: [] };
-  const currentPageLinks = pages[currentPageIndex]?.links ?? [];
+  const currentPageLinks = useMemo(
+    () => dedupeLinksByUrl(pages[currentPageIndex]?.links ?? []),
+    [currentPageIndex, pages],
+  );
   const currentPreviewPage = activePreviewPages[currentPageIndex];
   const currentPreviewPages =
     currentPreviewPage === undefined ? [] : [currentPreviewPage];

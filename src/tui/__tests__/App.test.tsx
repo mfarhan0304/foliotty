@@ -616,8 +616,8 @@ describe('App', () => {
 
     const frame = lastChromeFrame(result);
     assert.match(frame, /Links/);
-    assert.match(frame, /> 1\. GitHub -> https:\/\/github\.com\/example/);
-    assert.match(frame, /  2\. Email -> mailto:test@example\.com/);
+    assert.match(frame, /> 1\. https:\/\/github\.com\/example/);
+    assert.match(frame, /  2\. mailto:test@example\.com/);
     assert.match(frame, /links/);
   });
 
@@ -647,7 +647,7 @@ describe('App', () => {
     await tick(20);
 
     assert.deepEqual(openedUrls, ['mailto:test@example.com']);
-    assert.match(lastChromeFrame(result), /> 2\. Email/);
+    assert.match(lastChromeFrame(result), /> 2\. mailto:test@example\.com/);
   });
 
   test('exits link selection mode with escape', async () => {
