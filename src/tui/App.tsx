@@ -53,6 +53,7 @@ type DisplayPage = {
 
 const EMPTY_RASTER_PAGES: RasterPage[] = [];
 const EMPTY_TEXT_PAGES: TextItem[][] = [];
+const MAX_CACHED_PREVIEW_PAGES = 8;
 
 type FlattenedDocument = {
   displayPages: DisplayPage[];
@@ -152,6 +153,9 @@ export function App({
     useState<RasterPage[]>(previewPages);
   const renderedPreviewPageIndexesRef = useRef<Set<number>>(
     new Set(previewPages.map((_, index) => index)),
+  );
+  const previewPageAccessOrder = useRef<number[]>(
+    previewPages.map((_, index) => index),
   );
   const previewRenderPromises = useRef<Map<number, Promise<void>>>(new Map());
   const [renderingPreviewPageIndex, setRenderingPreviewPageIndex] = useState<
@@ -266,12 +270,59 @@ export function App({
     });
   }
 
+  function markPreviewPageAccessed(pageIndex: number): void {
+    previewPageAccessOrder.current = [
+      ...previewPageAccessOrder.current.filter((index) => index !== pageIndex),
+      pageIndex,
+    ];
+  }
+
+  function prunePreviewPageCache(
+    pagesToPrune: RasterPage[],
+    extraProtectedPageIndexes: Set<number> = new Set(),
+  ): RasterPage[] {
+    const protectedPageIndexes = new Set([
+      currentPageIndex,
+      currentPageIndex - 1,
+      currentPageIndex + 1,
+      ...highlightedPreviewPageIndexes,
+      ...extraProtectedPageIndexes,
+    ]);
+    const cachedPageIndexes = new Set(
+      pagesToPrune
+        .map((page, index) => (page === undefined ? null : index))
+        .filter((index): index is number => index !== null),
+    );
+
+    while (cachedPageIndexes.size > MAX_CACHED_PREVIEW_PAGES) {
+      const evictablePageIndex = previewPageAccessOrder.current.find(
+        (pageIndex) =>
+          cachedPageIndexes.has(pageIndex) &&
+          !protectedPageIndexes.has(pageIndex),
+      );
+
+      if (evictablePageIndex === undefined) {
+        break;
+      }
+
+      delete pagesToPrune[evictablePageIndex];
+      cachedPageIndexes.delete(evictablePageIndex);
+      renderedPreviewPageIndexesRef.current.delete(evictablePageIndex);
+      previewPageAccessOrder.current = previewPageAccessOrder.current.filter(
+        (pageIndex) => pageIndex !== evictablePageIndex,
+      );
+    }
+
+    return pagesToPrune;
+  }
+
   function cachePreviewPage(pageIndex: number, page: RasterPage): void {
     setHighlightedPreviewPages((currentPages) => {
       const nextPages =
         currentPages.length > 0 ? [...currentPages] : [...previewPages];
       nextPages[pageIndex] = page;
-      return nextPages;
+      markPreviewPageAccessed(pageIndex);
+      return prunePreviewPageCache(nextPages, new Set([pageIndex]));
     });
     renderedPreviewPageIndexesRef.current = new Set([
       ...renderedPreviewPageIndexesRef.current,
@@ -374,7 +425,8 @@ export function App({
       const nextPages =
         currentPages.length > 0 ? [...currentPages] : [...previewPages];
       nextPages[hit.pageIndex] = highlightedPage;
-      return nextPages;
+      markPreviewPageAccessed(hit.pageIndex);
+      return prunePreviewPageCache(nextPages, new Set([hit.pageIndex]));
     });
     renderedPreviewPageIndexesRef.current = new Set([
       ...renderedPreviewPageIndexesRef.current,
@@ -458,6 +510,7 @@ export function App({
     );
     setHighlightedPreviewPages(previewPages);
     renderedPreviewPageIndexesRef.current = initialRenderedPageIndexes;
+    previewPageAccessOrder.current = previewPages.map((_, index) => index);
     previewRenderPromises.current.clear();
     setHighlightedPreviewPageIndexes(new Set());
     setActivePreviewHitIndex(0);

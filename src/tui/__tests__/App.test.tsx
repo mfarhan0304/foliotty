@@ -217,6 +217,41 @@ describe('App', () => {
     assert.match(result.lastFrame() ?? '', /page 2\/3/);
   });
 
+  test('evicts old preview pages from the render cache', async () => {
+    const renderedPages: number[] = [];
+    const pageBundles = Array.from({ length: 12 }, (_, index) => ({
+      lines: [createLine(`Page ${index + 1}`)],
+      links: [],
+    }));
+    const result = render(
+      <App
+        filename="resume.pdf"
+        graphicsCapability="kitty"
+        pages={pageBundles}
+        previewPages={[{ ...createRasterPage(), pageNumber: 1 }]}
+        renderPreviewPage={async (pageIndex) => {
+          renderedPages.push(pageIndex);
+          return { ...createRasterPage(), pageNumber: pageIndex + 1 };
+        }}
+      />,
+    );
+
+    for (let index = 0; index < 10; index += 1) {
+      result.stdin.write('K');
+      await tick(40);
+    }
+
+    result.stdin.write('p');
+    await tick(20);
+    result.stdin.write('1');
+    await tick(20);
+    result.stdin.write('\r');
+    await tick(40);
+
+    assert.ok(renderedPages.filter((pageIndex) => pageIndex === 0).length >= 1);
+    assert.match(result.lastFrame() ?? '', /page 1\/12/);
+  });
+
   test('toggles from preview mode to text mode', async () => {
     const result = render(
       <App
