@@ -107,5 +107,5 @@ export function PreviewView({
     );
   }
 
-  return <Box flexGrow={1} height={reservedRows} />;
+  return <Text>{'\n'.repeat(Math.max(0, reservedRows))}</Text>;
 }
