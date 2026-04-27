@@ -33,6 +33,7 @@ export type HighlightRect = {
 };
 
 export type RenderPdfPageOptions = {
+  activeHighlights?: HighlightRect[];
   canvasBackend?: CanvasBackend;
   displayColumns?: number;
   displayHeight?: number;
@@ -123,6 +124,7 @@ async function openPdfDocument(filePath: string): Promise<PDFDocumentProxy> {
 export async function renderPdfPageToPng(
   filePath: string,
   {
+    activeHighlights = [],
     canvasBackend,
     displayColumns,
     displayHeight,
@@ -161,6 +163,19 @@ export async function renderPdfPageToPng(
       canvasContext.fillStyle = 'rgba(255, 230, 0, 0.45)';
 
       for (const rect of highlights) {
+        canvasContext.fillRect(
+          rect.x * resolvedScale,
+          viewport.height - (rect.y + rect.height) * resolvedScale,
+          rect.width * resolvedScale,
+          rect.height * resolvedScale,
+        );
+      }
+    }
+
+    if (activeHighlights.length > 0) {
+      canvasContext.fillStyle = 'rgba(255, 166, 0, 0.75)';
+
+      for (const rect of activeHighlights) {
         canvasContext.fillRect(
           rect.x * resolvedScale,
           viewport.height - (rect.y + rect.height) * resolvedScale,

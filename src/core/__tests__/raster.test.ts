@@ -142,4 +142,61 @@ describe('renderPdfPageToPng', () => {
 
     assert.deepEqual(fillRects.at(-1), [36, 31, 10, 5]);
   });
+
+  test('draws active highlight rectangles after regular highlights', async () => {
+    tempDirectory = await mkdtemp(join(tmpdir(), 'foliotty-raster-'));
+    const filePath = join(tempDirectory, 'simple.pdf');
+    const fillOperations: Array<{ rect: number[]; style: string }> = [];
+    await writeFile(filePath, createTextPdf('Preview'));
+    const contextState = { fillStyle: '' };
+    const context = new Proxy(
+      {
+        canvas: { height: 396, width: 306 },
+        fillRect: (...args: number[]) =>
+          fillOperations.push({ rect: args, style: contextState.fillStyle }),
+        fillStyle: '',
+        getTransform: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }),
+        measureText: () => ({ width: 0 }),
+      },
+      {
+        get(target, property) {
+          if (property in target) {
+            return target[property as keyof typeof target];
+          }
+
+          return () => undefined;
+        },
+        set(target, property, value) {
+          target[property as keyof typeof target] = value as never;
+          if (property === 'fillStyle') {
+            contextState.fillStyle = String(value);
+          }
+          return true;
+        },
+      },
+    );
+
+    const canvasBackend: CanvasBackend = {
+      createCanvas: () => ({
+        getContext: () => context,
+        toBuffer: () => Buffer.from('png'),
+      }),
+    };
+
+    await renderPdfPageToPng(filePath, {
+      activeHighlights: [{ height: 10, width: 20, x: 100, y: 720 }],
+      canvasBackend,
+      highlights: [{ height: 10, width: 20, x: 72, y: 720 }],
+      width: 306,
+    });
+
+    assert.deepEqual(fillOperations.at(-2), {
+      rect: [36, 31, 10, 5],
+      style: 'rgba(255, 230, 0, 0.45)',
+    });
+    assert.deepEqual(fillOperations.at(-1), {
+      rect: [50, 31, 10, 5],
+      style: 'rgba(255, 166, 0, 0.75)',
+    });
+  });
 });

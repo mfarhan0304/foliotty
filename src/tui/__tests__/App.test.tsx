@@ -276,7 +276,11 @@ describe('App', () => {
   });
 
   test('searches preview mode with highlighted raster rendering', async () => {
-    const renderedPages: Array<{ pageIndex: number; query: string }> = [];
+    const renderedPages: Array<{
+      activeHitIndex: number;
+      pageIndex: number;
+      query: string;
+    }> = [];
     const result = render(
       <App
         filename="resume.pdf"
@@ -288,8 +292,12 @@ describe('App', () => {
           },
         ]}
         previewPages={[createRasterPage()]}
-        renderHighlightedPreviewPage={async (pageIndex, query) => {
-          renderedPages.push({ pageIndex, query });
+        renderHighlightedPreviewPage={async (
+          pageIndex,
+          query,
+          activeHitIndex,
+        ) => {
+          renderedPages.push({ activeHitIndex, pageIndex, query });
           return {
             ...createRasterPage(),
             png: Buffer.from('highlighted'),
@@ -306,13 +314,19 @@ describe('App', () => {
     result.stdin.write('\r');
     await tick(30);
 
-    assert.deepEqual(renderedPages, [{ pageIndex: 0, query: 'Find' }]);
+    assert.deepEqual(renderedPages, [
+      { activeHitIndex: 0, pageIndex: 0, query: 'Find' },
+    ]);
     assert.match(result.lastFrame() ?? '', /preview/);
     assert.match(result.lastFrame() ?? '', /hit 1\/1/);
   });
 
   test('moves between preview search hits with n and N', async () => {
-    const renderedPages: Array<{ pageIndex: number; query: string }> = [];
+    const renderedPages: Array<{
+      activeHitIndex: number;
+      pageIndex: number;
+      query: string;
+    }> = [];
     const result = render(
       <App
         filename="resume.pdf"
@@ -325,8 +339,12 @@ describe('App', () => {
           { ...createRasterPage(), pageNumber: 1 },
           { ...createRasterPage(), pageNumber: 2 },
         ]}
-        renderHighlightedPreviewPage={async (pageIndex, query) => {
-          renderedPages.push({ pageIndex, query });
+        renderHighlightedPreviewPage={async (
+          pageIndex,
+          query,
+          activeHitIndex,
+        ) => {
+          renderedPages.push({ activeHitIndex, pageIndex, query });
           return {
             ...createRasterPage(),
             pageNumber: pageIndex + 1,
@@ -347,7 +365,9 @@ describe('App', () => {
     result.stdin.write('\r');
     await tick(30);
 
-    assert.deepEqual(renderedPages, [{ pageIndex: 0, query: 'Needle' }]);
+    assert.deepEqual(renderedPages, [
+      { activeHitIndex: 0, pageIndex: 0, query: 'Needle' },
+    ]);
     assert.match(result.lastFrame() ?? '', /page 1\/2/);
     assert.match(result.lastFrame() ?? '', /hit 1\/2/);
 
@@ -355,8 +375,8 @@ describe('App', () => {
     await tick(30);
 
     assert.deepEqual(renderedPages, [
-      { pageIndex: 0, query: 'Needle' },
-      { pageIndex: 1, query: 'Needle' },
+      { activeHitIndex: 0, pageIndex: 0, query: 'Needle' },
+      { activeHitIndex: 1, pageIndex: 1, query: 'Needle' },
     ]);
     assert.match(result.lastFrame() ?? '', /page 2\/2/);
     assert.match(result.lastFrame() ?? '', /hit 2\/2/);
@@ -365,8 +385,8 @@ describe('App', () => {
     await tick(30);
 
     assert.deepEqual(renderedPages, [
-      { pageIndex: 0, query: 'Needle' },
-      { pageIndex: 1, query: 'Needle' },
+      { activeHitIndex: 0, pageIndex: 0, query: 'Needle' },
+      { activeHitIndex: 1, pageIndex: 1, query: 'Needle' },
     ]);
     assert.match(result.lastFrame() ?? '', /page 1\/2/);
     assert.match(result.lastFrame() ?? '', /hit 1\/2/);

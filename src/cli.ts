@@ -102,18 +102,24 @@ try {
     const renderHighlightedPreviewPage = async (
       pageIndex: number,
       query: string,
-    ) =>
-      renderPdfPageToPng(filePath, {
+      activeHitIndex: number,
+    ) => {
+      const searchHits = searchTextItems(document.pages, query);
+      const pageHits = searchHits.filter((hit) => hit.pageIndex === pageIndex);
+      const activeHit = searchHits[activeHitIndex];
+
+      return renderPdfPageToPng(filePath, {
+        activeHighlights:
+          activeHit?.pageIndex === pageIndex ? activeHit.rects : [],
         displayColumns: previewFit.displayColumns,
         displayHeight: previewFit.displayHeight,
         displayRows: previewFit.displayRows,
         displayWidth: previewFit.displayWidth,
-        highlights: searchTextItems(document.pages, query)
-          .filter((hit) => hit.pageIndex === pageIndex)
-          .flatMap((hit) => hit.rects),
+        highlights: pageHits.flatMap((hit) => hit.rects),
         pageNumber: pageIndex + 1,
         width: previewFit.renderWidth,
       });
+    };
     const renderPreviewPage = (pageIndex: number) =>
       renderPdfPageToPng(filePath, {
         displayColumns: previewFit.displayColumns,

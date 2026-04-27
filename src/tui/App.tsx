@@ -39,6 +39,7 @@ type AppProps = {
   renderHighlightedPreviewPage?: (
     pageIndex: number,
     query: string,
+    activeHitIndex: number,
   ) => Promise<RasterPage>;
   renderPreviewPage?: (pageIndex: number) => Promise<RasterPage>;
   textPages?: TextItem[][];
@@ -419,6 +420,7 @@ export function App({
     const highlightedPage = await renderHighlightedPreviewPage(
       hit.pageIndex,
       query,
+      hitIndex,
     );
 
     setHighlightedPreviewPages((currentPages) => {
