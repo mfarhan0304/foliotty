@@ -231,13 +231,6 @@ export function App({
     displayMode === 'preview' && renderingPreviewPageIndex !== null
       ? `rendering page ${renderingPreviewPageIndex + 1}`
       : undefined;
-  const previewRepaintKey =
-    mode === 'search'
-      ? `${mode}:${searchValue}`
-      : mode === 'page'
-        ? `${mode}:${pageValue}`
-        : mode;
-
   function maxScrollForPage(pageIndex: number): number {
     return Math.max(
       0,
@@ -405,7 +398,6 @@ export function App({
     hitIndex: number,
     query: string,
     nextPreviewHits: PageSearchHit[] = previewHits,
-    cachedPageIndexes: Set<number> = highlightedPreviewPageIndexes,
   ): Promise<void> {
     if (renderHighlightedPreviewPage === undefined) {
       return;
@@ -418,10 +410,6 @@ export function App({
     }
 
     moveToPage(hit.pageIndex);
-
-    if (cachedPageIndexes.has(hit.pageIndex)) {
-      return;
-    }
 
     setRenderingPreviewPageIndex(hit.pageIndex);
 
@@ -489,7 +477,7 @@ export function App({
     }
 
     setHighlightedPreviewPageIndexes(new Set());
-    await renderPreviewHit(0, value, nextPreviewHits, new Set());
+    await renderPreviewHit(0, value, nextPreviewHits);
     setMode('normal');
   }
 
@@ -800,7 +788,6 @@ export function App({
             isRendering={renderingPreviewPageIndex === currentPageIndex}
             pageNumber={currentPageNumber}
             pages={currentPreviewPages}
-            repaintKey={previewRepaintKey}
           />
         ) : (
           <ResumeView
@@ -861,7 +848,11 @@ export function App({
         <Box paddingX={1}>
           <Text dimColor>j/k select · Enter open · Esc cancel</Text>
         </Box>
-      ) : null}
+      ) : (
+        <Box paddingX={1}>
+          <Text> </Text>
+        </Box>
+      )}
     </Box>
   );
 }

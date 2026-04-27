@@ -48,38 +48,38 @@ describe('renderInlinePreviewImage', () => {
   test('renders Kitty inline PNG escape sequence', () => {
     assert.equal(
       renderInlinePreviewImage(createRasterPage(), 'kitty'),
-      '\u001B[2J\u001B[3J\u001B[H\u001B_Ga=d,d=A\u001B\\\u001B_Ga=T,f=100;cG5n\u001B\\',
+      '[H_Ga=d,d=A\\_Ga=T,f=100;cG5n\\',
     );
   });
 
   test('renders iTerm inline PNG escape sequence', () => {
     assert.equal(
       renderInlinePreviewImage(createRasterPage(), 'iterm'),
-      '\u001B[2J\u001B[3J\u001B[H\u001B]1337;File=inline=1;width=1px;height=1px:cG5n\u0007',
+      '[H]1337;File=inline=1;width=1px;height=1px:cG5n',
     );
   });
 
   test('uses explicit display dimensions when available', () => {
     assert.equal(
       renderInlinePreviewImage(createDisplayedRasterPage(), 'iterm'),
-      '\u001B[2J\u001B[3J\u001B[H\u001B]1337;File=inline=1;width=40px;height=50px:cG5n\u0007',
+      '[H]1337;File=inline=1;width=40px;height=50px:cG5n',
     );
     assert.equal(
       renderInlinePreviewImage(createDisplayedRasterPage(), 'kitty'),
-      '\u001B[2J\u001B[3J\u001B[H\u001B_Ga=d,d=A\u001B\\\u001B_Ga=T,f=100,c=10,r=5;cG5n\u001B\\',
+      '[H_Ga=d,d=A\\_Ga=T,f=100,c=10,r=5;cG5n\\',
     );
   });
 
-  test('can repaint without clearing surrounding terminal chrome', () => {
+  test('can repaint without deleting prior images', () => {
     assert.equal(
       renderInlinePreviewImage(createRasterPage(), 'iterm', { clear: false }),
-      '\u001B[H\u001B]1337;File=inline=1;width=1px;height=1px:cG5n\u0007',
+      '[H]1337;File=inline=1;width=1px;height=1px:cG5n',
     );
     assert.equal(
       renderInlinePreviewImage(createDisplayedRasterPage(), 'kitty', {
         clear: false,
       }),
-      '\u001B[H\u001B_Ga=T,f=100,c=10,r=5;cG5n\u001B\\',
+      '[H_Ga=T,f=100,c=10,r=5;cG5n\\',
     );
   });
 

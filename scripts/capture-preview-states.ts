@@ -79,7 +79,13 @@ function harnessRender(tree: React.ReactElement): RenderResult {
           continue;
         }
 
-        if (frame.startsWith('[2J')) {
+        // Skip side-channel image emits (cursor-home prefix) and full screen
+        // clears so the harness returns ink's last chrome render.
+        if (
+          frame.startsWith('7') ||
+          frame.startsWith('[H') ||
+          frame.startsWith('[2J')
+        ) {
           continue;
         }
 

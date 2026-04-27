@@ -9,7 +9,6 @@ type PreviewViewProps = {
   isRendering?: boolean;
   pageNumber: number;
   pages: RasterPage[];
-  repaintKey?: string;
 };
 
 type RenderInlinePreviewImageOptions = {
@@ -32,8 +31,7 @@ export function renderInlinePreviewImage(
   }
 
   const clear = options.clear ?? true;
-  const resetCursor = '\u001B[H';
-  const resetScreen = clear ? '\u001B[2J\u001B[3J\u001B[H' : resetCursor;
+  const resetCursor = '[H';
   const payload = page.png.toString('base64');
   const displayWidth = page.displayWidth ?? page.width;
   const displayHeight = page.displayHeight ?? page.height;
@@ -44,12 +42,12 @@ export function renderInlinePreviewImage(
         ? ''
         : `,c=${page.displayColumns},r=${page.displayRows}`;
 
-    const deleteExistingImage = clear ? '\u001B_Ga=d,d=A\u001B\\' : '';
+    const deleteExistingImage = clear ? '_Ga=d,d=A\\' : '';
 
-    return `${resetScreen}${deleteExistingImage}\u001B_Ga=T,f=100${placement};${payload}\u001B\\`;
+    return `${resetCursor}${deleteExistingImage}_Ga=T,f=100${placement};${payload}\\`;
   }
 
-  return `${resetScreen}\u001B]1337;File=inline=1;width=${displayWidth}px;height=${displayHeight}px:${payload}\u0007`;
+  return `${resetCursor}]1337;File=inline=1;width=${displayWidth}px;height=${displayHeight}px:${payload}`;
 }
 
 export function PreviewView({
@@ -57,13 +55,17 @@ export function PreviewView({
   isRendering = false,
   pageNumber,
   pages,
-  repaintKey = '',
 }: PreviewViewProps): React.JSX.Element {
   const { stdout } = useStdout();
   const currentPage = pages[0];
   const reservedRows = currentPage?.displayRows ?? 0;
   const lastRenderedPage = useRef<RasterPage | null>(null);
 
+  // Re-emit the image after every render. ink's fullscreen branch writes
+  // clearTerminal each render (when chrome fills the terminal), which wipes
+  // the previous image. We also schedule a delayed re-emit because ink throttles
+  // its onRender (default ~33ms trailing edge) and the trailing write fires
+  // *after* this effect, wiping the image we just placed; the timer catches it.
   useEffect(() => {
     if (currentPage === undefined) {
       return;
@@ -76,19 +78,17 @@ export function PreviewView({
       return;
     }
 
-    if (clear) {
-      stdout.write(escape);
-      lastRenderedPage.current = currentPage;
-      return;
-    }
-
-    const repaintTimer = setTimeout(() => {
-      stdout.write(escape);
-    }, 0);
+    // Wrap the image emit in DECSC/DECRC so the terminal cursor lands back
+    // exactly where ink left it.
+    const wrapped = `7${escape}8`;
+    stdout.write(wrapped);
     lastRenderedPage.current = currentPage;
 
-    return () => clearTimeout(repaintTimer);
-  }, [capability, currentPage, repaintKey, stdout]);
+    const followUp = setTimeout(() => {
+      stdout.write(wrapped);
+    }, 60);
+    return () => clearTimeout(followUp);
+  });
 
   if (currentPage === undefined || !supportsInlinePreview(capability)) {
     return (
