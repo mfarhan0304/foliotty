@@ -13,6 +13,7 @@ type PreviewViewProps = {
 
 type RenderInlinePreviewImageOptions = {
   clear?: boolean;
+  originColumn?: number;
 };
 
 export function supportsInlinePreview(
@@ -31,7 +32,8 @@ export function renderInlinePreviewImage(
   }
 
   const clear = options.clear ?? true;
-  const resetCursor = '[H';
+  const originColumn = options.originColumn ?? 1;
+  const resetCursor = `[1;${originColumn}H`;
   const payload = page.png.toString('base64');
   const displayWidth = page.displayWidth ?? page.width;
   const displayHeight = page.displayHeight ?? page.height;
@@ -47,7 +49,17 @@ export function renderInlinePreviewImage(
     return `${resetCursor}${deleteExistingImage}_Ga=T,f=100${placement};${payload}\\`;
   }
 
-  return `${resetCursor}]1337;File=inline=1;width=${displayWidth}px;height=${displayHeight}px:${payload}`;
+  // iTerm OSC 1337: a bare number means N character cells. Sizing in cells
+  // (instead of px) makes the image footprint match displayColumns/displayRows
+  // exactly regardless of the terminal's actual cell pixel size, which keeps
+  // centering math accurate. The PNG is rendered at higher pixel density
+  // (renderWidth = 2x displayWidth) so iTerm has resolution to scale down.
+  const itermColumns =
+    page.displayColumns ?? Math.max(1, Math.round(displayWidth / 10));
+  const itermRows =
+    page.displayRows ?? Math.max(1, Math.round(displayHeight / 24));
+
+  return `${resetCursor}]1337;File=inline=1;width=${itermColumns};height=${itermRows}:${payload}`;
 }
 
 export function PreviewView({
@@ -72,7 +84,16 @@ export function PreviewView({
     }
 
     const clear = lastRenderedPage.current !== currentPage;
-    const escape = renderInlinePreviewImage(currentPage, capability, { clear });
+    const terminalColumns = stdout.columns ?? 80;
+    const pageColumns = currentPage.displayColumns ?? terminalColumns;
+    const originColumn = Math.max(
+      1,
+      Math.floor((terminalColumns - pageColumns) / 2) + 1,
+    );
+    const escape = renderInlinePreviewImage(currentPage, capability, {
+      clear,
+      originColumn,
+    });
 
     if (escape === null) {
       return;

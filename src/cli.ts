@@ -46,8 +46,10 @@ const PREVIEW_CELL_WIDTH = 10;
 const PREVIEW_RENDER_SCALE = 2;
 
 function fitPreviewToTerminal(columns = 80, rows = 24): PreviewFit {
+  // Chrome below the preview is two rows: a single-line status bar plus a
+  // single-line hint placeholder.
   const usableColumns = Math.max(20, columns - 2);
-  const usableRows = Math.max(8, rows - 4);
+  const usableRows = Math.max(8, rows - 2);
   const maxDisplayWidth = usableColumns * PREVIEW_CELL_WIDTH;
   const maxDisplayHeight = usableRows * PREVIEW_CELL_HEIGHT;
   const widthConstrainedHeight = Math.floor(

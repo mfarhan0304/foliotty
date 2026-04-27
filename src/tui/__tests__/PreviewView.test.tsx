@@ -48,38 +48,38 @@ describe('renderInlinePreviewImage', () => {
   test('renders Kitty inline PNG escape sequence', () => {
     assert.equal(
       renderInlinePreviewImage(createRasterPage(), 'kitty'),
-      '[H_Ga=d,d=A\\_Ga=T,f=100;cG5n\\',
+      '[1;1H_Ga=d,d=A\\_Ga=T,f=100;cG5n\\',
     );
   });
 
   test('renders iTerm inline PNG escape sequence', () => {
     assert.equal(
       renderInlinePreviewImage(createRasterPage(), 'iterm'),
-      '[H]1337;File=inline=1;width=1px;height=1px:cG5n',
+      '[1;1H]1337;File=inline=1;width=1;height=1:cG5n',
     );
   });
 
   test('uses explicit display dimensions when available', () => {
     assert.equal(
       renderInlinePreviewImage(createDisplayedRasterPage(), 'iterm'),
-      '[H]1337;File=inline=1;width=40px;height=50px:cG5n',
+      '[1;1H]1337;File=inline=1;width=10;height=5:cG5n',
     );
     assert.equal(
       renderInlinePreviewImage(createDisplayedRasterPage(), 'kitty'),
-      '[H_Ga=d,d=A\\_Ga=T,f=100,c=10,r=5;cG5n\\',
+      '[1;1H_Ga=d,d=A\\_Ga=T,f=100,c=10,r=5;cG5n\\',
     );
   });
 
   test('can repaint without deleting prior images', () => {
     assert.equal(
       renderInlinePreviewImage(createRasterPage(), 'iterm', { clear: false }),
-      '[H]1337;File=inline=1;width=1px;height=1px:cG5n',
+      '[1;1H]1337;File=inline=1;width=1;height=1:cG5n',
     );
     assert.equal(
       renderInlinePreviewImage(createDisplayedRasterPage(), 'kitty', {
         clear: false,
       }),
-      '[H_Ga=T,f=100,c=10,r=5;cG5n\\',
+      '[1;1H_Ga=T,f=100,c=10,r=5;cG5n\\',
     );
   });
 

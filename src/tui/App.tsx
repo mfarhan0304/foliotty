@@ -745,18 +745,8 @@ export function App({
     }
   });
 
-  // Cap the outer Box one row short of the terminal so the rendered output
-  // stays under stdout.rows. That keeps ink on the log-update incremental
-  // path (only changed lines are rewritten) instead of the fullscreen branch
-  // that emits clearTerminal each render and wipes the inline preview image.
-  const reportedRows = stdout.rows;
-  const terminalRows =
-    reportedRows !== undefined && reportedRows > 0 ? reportedRows : 24;
-  const chromeHeight =
-    displayMode === 'preview' ? Math.max(1, terminalRows - 1) : undefined;
-
   return (
-    <Box flexDirection="column" height={chromeHeight}>
+    <Box flexDirection="column">
       <Box flexDirection="column" flexGrow={1}>
         {mode === 'help' ? (
           <HelpOverlay />
