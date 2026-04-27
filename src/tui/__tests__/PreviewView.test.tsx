@@ -70,6 +70,19 @@ describe('renderInlinePreviewImage', () => {
     );
   });
 
+  test('can repaint without clearing surrounding terminal chrome', () => {
+    assert.equal(
+      renderInlinePreviewImage(createRasterPage(), 'iterm', { clear: false }),
+      '\u001B[H\u001B]1337;File=inline=1;width=1px;height=1px:cG5n\u0007',
+    );
+    assert.equal(
+      renderInlinePreviewImage(createDisplayedRasterPage(), 'kitty', {
+        clear: false,
+      }),
+      '\u001B[H\u001B_Ga=T,f=100,c=10,r=5;cG5n\u001B\\',
+    );
+  });
+
   test('returns null when direct PNG preview is unsupported', () => {
     assert.equal(renderInlinePreviewImage(createRasterPage(), 'sixel'), null);
   });

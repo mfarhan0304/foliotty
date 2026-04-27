@@ -783,6 +783,7 @@ export function App({
             isRendering={renderingPreviewPageIndex === currentPageIndex}
             pageNumber={currentPageNumber}
             pages={currentPreviewPages}
+            repaintKey={mode}
           />
         ) : (
           <ResumeView

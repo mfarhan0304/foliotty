@@ -32,6 +32,12 @@ function lastChromeFrame(result: { stdout: { frames: string[] } }): string {
   return '';
 }
 
+function countInlinePreviewFrames(result: { stdout: { frames: string[] } }) {
+  return result.stdout.frames.filter(
+    (frame) => frame.includes('_Ga=T') || frame.includes(']1337;File='),
+  ).length;
+}
+
 function createLine(
   text: string,
   kind: StyledLine['kind'] = 'body',
@@ -294,6 +300,31 @@ describe('App', () => {
     const frame = result.lastFrame() ?? '';
     assert.match(frame, /Text Mode/);
     assert.match(frame, /text/);
+  });
+
+  test('repaints preview when opening the search prompt', async () => {
+    const result = render(
+      <App
+        filename="resume.pdf"
+        graphicsCapability="kitty"
+        pages={[
+          {
+            lines: [createLine('Find me')],
+            links: [],
+          },
+        ]}
+        previewPages={[createRasterPage()]}
+      />,
+    );
+
+    await tick(20);
+    const initialInlineFrameCount = countInlinePreviewFrames(result);
+
+    result.stdin.write('/');
+    await tick(20);
+
+    assert.equal(countInlinePreviewFrames(result), initialInlineFrameCount + 1);
+    assert.match(result.lastFrame() ?? '', /Enter submit/);
   });
 
   test('searches preview mode with highlighted raster rendering', async () => {

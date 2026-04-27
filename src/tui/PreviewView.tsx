@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Box, Text, useStdout } from 'ink';
 
 import type { RasterPage } from '../core/raster.js';
@@ -9,6 +9,11 @@ type PreviewViewProps = {
   isRendering?: boolean;
   pageNumber: number;
   pages: RasterPage[];
+  repaintKey?: string;
+};
+
+type RenderInlinePreviewImageOptions = {
+  clear?: boolean;
 };
 
 export function supportsInlinePreview(
@@ -20,11 +25,15 @@ export function supportsInlinePreview(
 export function renderInlinePreviewImage(
   page: RasterPage,
   capability: GraphicsCapability,
+  options: RenderInlinePreviewImageOptions = {},
 ): string | null {
   if (!supportsInlinePreview(capability)) {
     return null;
   }
 
+  const clear = options.clear ?? true;
+  const resetCursor = '\u001B[H';
+  const resetScreen = clear ? '\u001B[2J\u001B[3J\u001B[H' : resetCursor;
   const payload = page.png.toString('base64');
   const displayWidth = page.displayWidth ?? page.width;
   const displayHeight = page.displayHeight ?? page.height;
@@ -35,10 +44,12 @@ export function renderInlinePreviewImage(
         ? ''
         : `,c=${page.displayColumns},r=${page.displayRows}`;
 
-    return `[2J[3J[H_Ga=d,d=A\\_Ga=T,f=100${placement};${payload}\\`;
+    const deleteExistingImage = clear ? '\u001B_Ga=d,d=A\u001B\\' : '';
+
+    return `${resetScreen}${deleteExistingImage}\u001B_Ga=T,f=100${placement};${payload}\u001B\\`;
   }
 
-  return `[2J[3J[H]1337;File=inline=1;width=${displayWidth}px;height=${displayHeight}px:${payload}`;
+  return `${resetScreen}\u001B]1337;File=inline=1;width=${displayWidth}px;height=${displayHeight}px:${payload}\u0007`;
 }
 
 export function PreviewView({
@@ -46,24 +57,28 @@ export function PreviewView({
   isRendering = false,
   pageNumber,
   pages,
+  repaintKey = '',
 }: PreviewViewProps): React.JSX.Element {
   const { stdout } = useStdout();
   const currentPage = pages[0];
   const reservedRows = currentPage?.displayRows ?? 0;
+  const lastRenderedPage = useRef<RasterPage | null>(null);
 
   useEffect(() => {
     if (currentPage === undefined) {
       return;
     }
 
-    const escape = renderInlinePreviewImage(currentPage, capability);
+    const clear = lastRenderedPage.current !== currentPage;
+    const escape = renderInlinePreviewImage(currentPage, capability, { clear });
 
     if (escape === null) {
       return;
     }
 
     stdout.write(escape);
-  }, [capability, currentPage, stdout]);
+    lastRenderedPage.current = currentPage;
+  }, [capability, currentPage, repaintKey, stdout]);
 
   if (currentPage === undefined || !supportsInlinePreview(capability)) {
     return (
