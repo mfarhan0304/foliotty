@@ -11,20 +11,29 @@ export function HelpOverlay(): React.JSX.Element {
       width={54}
     >
       <Text bold>Keys</Text>
-      <Text>j / k previous or next line</Text>
-      <Text>Ctrl-D / Ctrl-U scroll half page</Text>
-      <Text>gg / G top or bottom</Text>
-      <Text>J / K previous or next page</Text>
-      <Text>p go to page</Text>
-      <Text>t toggle preview or text mode</Text>
-      <Text>l open links on current page</Text>
-      <Text>Enter open selected link</Text>
-      <Text>/ open search</Text>
-      <Text>Enter submit search</Text>
-      <Text>Esc cancel prompt, links, or help</Text>
-      <Text>n / N next or previous hit</Text>
-      <Text>? toggle help</Text>
-      <Text>q quit</Text>
+
+      <Text bold> </Text>
+      <Text bold>Read</Text>
+      <Text> j / k previous or next line</Text>
+      <Text> J / K previous or next page</Text>
+      <Text> p go to page</Text>
+      <Text> t toggle preview or text mode</Text>
+
+      <Text bold> </Text>
+      <Text bold>Search</Text>
+      <Text> / search</Text>
+      <Text> Enter submit search</Text>
+      <Text> n / N next or previous search</Text>
+
+      <Text bold> </Text>
+      <Text bold>Links</Text>
+      <Text> l show links on current page</Text>
+      <Text> Enter open selected link</Text>
+
+      <Text bold> </Text>
+      <Text bold>App</Text>
+      <Text> ? toggle help</Text>
+      <Text> Esc cancel or quit</Text>
     </Box>
   );
 }

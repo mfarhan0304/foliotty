@@ -6,8 +6,8 @@ import { wrapTextSegments } from './layout.js';
 import { renderStyledLineSlice } from './render.js';
 
 type ResumeViewProps = {
+  activeLineIndex: number | null;
   contentWidth: number;
-  currentHitLineIndex: number | null;
   hitRangesByLine: Map<number, Array<{ end: number; start: number }>>;
   lines: StyledLine[];
   scrollOffset: number;
@@ -61,8 +61,8 @@ function getVisibleSegments(
 }
 
 export function ResumeView({
+  activeLineIndex,
   contentWidth,
-  currentHitLineIndex,
   hitRangesByLine,
   lines,
   scrollOffset,
@@ -80,7 +80,7 @@ export function ResumeView({
       {segments.map((segment) => {
         const line = lines[segment.lineIndex];
         const prefix =
-          currentHitLineIndex === segment.lineIndex && segment.isFirstRow
+          activeLineIndex === segment.lineIndex && segment.isFirstRow
             ? '> '
             : '  ';
 

@@ -8,9 +8,9 @@ type StatusBarProps = {
   displayMode: 'preview' | 'text';
   filename: string;
   hitCount: number;
-  mode: 'help' | 'links' | 'normal' | 'page' | 'search';
   page: number;
   pageCount: number;
+  searchActive: boolean;
   totalLines: number;
 };
 
@@ -21,23 +21,40 @@ export function StatusBar({
   displayMode,
   filename,
   hitCount,
-  mode,
   page,
   pageCount,
+  searchActive,
   totalLines,
 }: StatusBarProps): React.JSX.Element {
-  const hitStatus =
-    activeHitOrdinal === undefined || hitCount === 0
-      ? `${hitCount} hit${hitCount === 1 ? '' : 's'}`
-      : `hit ${activeHitOrdinal}/${hitCount}`;
+  const segments: string[] = [filename];
+
+  if (displayMode === 'text') {
+    segments.push(
+      `line ${Math.min(currentLine + 1, totalLines)}/${totalLines}`,
+    );
+  }
+
+  segments.push(`page ${page}/${pageCount}`);
+  segments.push(displayMode);
+
+  if (searchActive) {
+    const hitStatus =
+      activeHitOrdinal === undefined || hitCount === 0
+        ? `${hitCount} hit${hitCount === 1 ? '' : 's'}`
+        : `hit ${activeHitOrdinal}/${hitCount}`;
+
+    segments.push(hitStatus);
+  } else {
+    segments.push('press ? for help');
+  }
+
+  if (activity !== undefined) {
+    segments.push(activity);
+  }
 
   return (
     <Box paddingX={1}>
-      <Text inverse>
-        {filename} · line {Math.min(currentLine + 1, totalLines)}/{totalLines} ·
-        page {page}/{pageCount} · {displayMode} · {mode} · {hitStatus}
-        {activity === undefined ? '' : ` · ${activity}`}
-      </Text>
+      <Text inverse>{segments.join(' · ')}</Text>
     </Box>
   );
 }

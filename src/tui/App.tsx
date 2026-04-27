@@ -205,7 +205,6 @@ export function App({
   const [highlightedPreviewPageIndexes, setHighlightedPreviewPageIndexes] =
     useState<Set<number>>(() => new Set());
   const [selectedLinkIndex, setSelectedLinkIndex] = useState(0);
-  const [awaitingSecondG, setAwaitingSecondG] = useState(false);
 
   const searchIndex = useMemo(() => createSearchIndex(lines), [lines]);
   const hits = useMemo(
@@ -629,7 +628,6 @@ export function App({
       if (key.escape) {
         setMode('normal');
         setPageValue('');
-        setAwaitingSecondG(false);
       }
 
       return;
@@ -671,35 +669,31 @@ export function App({
       return;
     }
 
-    if (input === 'q') {
+    if (key.escape || input === 'q') {
       exit();
       return;
     }
 
     if (input === '?') {
       setMode('help');
-      setAwaitingSecondG(false);
       return;
     }
 
     if (input === '/') {
       setSearchValue(activeQuery);
       setMode('search');
-      setAwaitingSecondG(false);
       return;
     }
 
     if (input === 'l') {
       setSelectedLinkIndex(0);
       setMode('links');
-      setAwaitingSecondG(false);
       return;
     }
 
     if (input === 'p') {
       setPageValue('');
       setMode('page');
-      setAwaitingSecondG(false);
       return;
     }
 
@@ -707,93 +701,48 @@ export function App({
       setDisplayMode((current) =>
         current === 'preview' || !previewAvailable ? 'text' : 'preview',
       );
-      setAwaitingSecondG(false);
       return;
     }
 
     if (input === 'j') {
       updatePageScroll(currentPageIndex, currentPageScrollOffset - 1);
-      setAwaitingSecondG(false);
       return;
     }
 
     if (input === 'k') {
       updatePageScroll(currentPageIndex, currentPageScrollOffset + 1);
-      setAwaitingSecondG(false);
-      return;
-    }
-
-    if (key.ctrl && input === 'd') {
-      updatePageScroll(
-        currentPageIndex,
-        currentPageScrollOffset + Math.floor(visibleRowCount / 2),
-      );
-      setAwaitingSecondG(false);
-      return;
-    }
-
-    if (key.ctrl && input === 'u') {
-      updatePageScroll(
-        currentPageIndex,
-        currentPageScrollOffset - Math.floor(visibleRowCount / 2),
-      );
-      setAwaitingSecondG(false);
       return;
     }
 
     if (input === 'n' && displayMode === 'preview' && previewHits.length > 0) {
       void movePreviewHit(1);
-      setAwaitingSecondG(false);
       return;
     }
 
     if (input === 'N' && displayMode === 'preview' && previewHits.length > 0) {
       void movePreviewHit(-1);
-      setAwaitingSecondG(false);
       return;
     }
 
     if (input === 'n' && hits.length > 0) {
       setActiveHitIndex((value) => (value + 1) % hits.length);
-      setAwaitingSecondG(false);
       return;
     }
 
     if (input === 'N' && hits.length > 0) {
       setActiveHitIndex((value) => (value - 1 + hits.length) % hits.length);
-      setAwaitingSecondG(false);
-      return;
-    }
-
-    if (input === 'G') {
-      updatePageScroll(currentPageIndex, maxScrollForPage(currentPageIndex));
-      setAwaitingSecondG(false);
-      return;
-    }
-
-    if (input === 'g') {
-      if (awaitingSecondG) {
-        updatePageScroll(currentPageIndex, 0);
-        setAwaitingSecondG(false);
-      } else {
-        setAwaitingSecondG(true);
-      }
       return;
     }
 
     if (input === 'J') {
       moveToPage(currentPageIndex - 1);
-      setAwaitingSecondG(false);
       return;
     }
 
     if (input === 'K') {
       moveToPage(currentPageIndex + 1);
-      setAwaitingSecondG(false);
       return;
     }
-
-    setAwaitingSecondG(false);
   });
 
   // Cap the outer Box one row short of the terminal so the rendered output
@@ -825,8 +774,8 @@ export function App({
           />
         ) : (
           <ResumeView
+            activeLineIndex={currentLine}
             contentWidth={contentWidth}
-            currentHitLineIndex={currentHitLocalLineIndex}
             hitRangesByLine={currentPageHitRanges}
             lines={currentPage.lines}
             scrollOffset={currentPageScrollOffset}
@@ -862,9 +811,9 @@ export function App({
           displayMode={displayMode}
           filename={filename}
           hitCount={statusHitCount}
-          mode={mode}
           page={currentPageNumber}
           pageCount={pageCount}
+          searchActive={activeQuery.length > 0}
           totalLines={currentPage.lines.length}
         />
       )}

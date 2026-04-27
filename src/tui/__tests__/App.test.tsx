@@ -592,7 +592,7 @@ describe('App', () => {
     const frame = lastChromeFrame(result);
     assert.match(frame, /Page Three/);
     assert.match(frame, /page 3\/3/);
-    assert.match(frame, /0 hits/);
+    assert.doesNotMatch(frame, /hit/);
   });
 
   test('opens link selection mode for the current page', async () => {
@@ -618,7 +618,7 @@ describe('App', () => {
     assert.match(frame, /Links/);
     assert.match(frame, /> 1\. https:\/\/github\.com\/example/);
     assert.match(frame, /  2\. mailto:test@example\.com/);
-    assert.match(frame, /links/);
+    assert.match(frame, /j\/k select/);
   });
 
   test('moves link selection and opens the selected link', async () => {
@@ -670,6 +670,6 @@ describe('App', () => {
 
     const frame = lastChromeFrame(result);
     assert.match(frame, /Page One/);
-    assert.match(frame, /normal/);
+    assert.doesNotMatch(frame, /j\/k select/);
   });
 });
