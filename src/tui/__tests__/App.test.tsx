@@ -329,6 +329,12 @@ describe('App', () => {
 
     assert.equal(countInlinePreviewFrames(result), initialInlineFrameCount + 1);
     assert.match(lastChromeFrame(result), /Enter submit/);
+
+    result.stdin.write('level');
+    await tick(20);
+
+    assert.ok(countInlinePreviewFrames(result) > initialInlineFrameCount + 1);
+    assert.match(lastChromeFrame(result), /Enter submit/);
   });
 
   test('searches preview mode with highlighted raster rendering', async () => {
@@ -407,10 +413,13 @@ describe('App', () => {
 
     result.stdin.write('Find');
     await tick(20);
+    const typedPromptFrameCount = countInlinePreviewFrames(result);
+
     result.stdin.write('\r');
     await tick(30);
 
-    assert.equal(countInlinePreviewFrames(result), promptFrameCount);
+    assert.ok(typedPromptFrameCount > promptFrameCount);
+    assert.equal(countInlinePreviewFrames(result), typedPromptFrameCount);
     assert.match(lastChromeFrame(result), /Enter submit/);
 
     resolveHighlight?.({
@@ -419,7 +428,7 @@ describe('App', () => {
     });
     await tick(40);
 
-    assert.ok(countInlinePreviewFrames(result) > promptFrameCount);
+    assert.ok(countInlinePreviewFrames(result) > typedPromptFrameCount);
     assert.match(lastChromeFrame(result), /hit 1\/1/);
   });
 

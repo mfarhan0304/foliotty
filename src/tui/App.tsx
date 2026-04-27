@@ -231,6 +231,12 @@ export function App({
     displayMode === 'preview' && renderingPreviewPageIndex !== null
       ? `rendering page ${renderingPreviewPageIndex + 1}`
       : undefined;
+  const previewRepaintKey =
+    mode === 'search'
+      ? `${mode}:${searchValue}`
+      : mode === 'page'
+        ? `${mode}:${pageValue}`
+        : mode;
 
   function maxScrollForPage(pageIndex: number): number {
     return Math.max(
@@ -794,7 +800,7 @@ export function App({
             isRendering={renderingPreviewPageIndex === currentPageIndex}
             pageNumber={currentPageNumber}
             pages={currentPreviewPages}
-            repaintKey={mode}
+            repaintKey={previewRepaintKey}
           />
         ) : (
           <ResumeView
