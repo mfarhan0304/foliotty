@@ -446,6 +446,39 @@ describe('App', () => {
     assert.match(frame, /page 3\/3/);
   });
 
+  test('page jump clears active search navigation', async () => {
+    const result = render(
+      <App
+        filename="resume.pdf"
+        pages={[
+          { lines: [createLine('restaurant on page one')], links: [] },
+          { lines: [createLine('Page Two')], links: [] },
+          { lines: [createLine('Page Three')], links: [] },
+        ]}
+      />,
+    );
+
+    result.stdin.write('/');
+    await tick(20);
+    result.stdin.write('restaurant');
+    await tick(20);
+    result.stdin.write('\r');
+    await tick(40);
+    assert.match(result.lastFrame() ?? '', /hit 1\/1/);
+
+    result.stdin.write('p');
+    await tick(20);
+    result.stdin.write('3');
+    await tick(20);
+    result.stdin.write('\r');
+    await tick(40);
+
+    const frame = result.lastFrame() ?? '';
+    assert.match(frame, /Page Three/);
+    assert.match(frame, /page 3\/3/);
+    assert.match(frame, /0 hits/);
+  });
+
   test('opens link selection mode for the current page', async () => {
     const result = render(
       <App

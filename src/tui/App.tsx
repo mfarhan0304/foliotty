@@ -480,6 +480,10 @@ export function App({
     const parsed = Number.parseInt(value, 10);
 
     if (Number.isFinite(parsed)) {
+      setActiveQuery('');
+      setActiveHitIndex(0);
+      setActivePreviewHitIndex(0);
+      setPreviewHits([]);
       moveToPage(parsed - 1);
     }
 
