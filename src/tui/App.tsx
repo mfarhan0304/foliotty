@@ -417,11 +417,21 @@ export function App({
       return;
     }
 
-    const highlightedPage = await renderHighlightedPreviewPage(
-      hit.pageIndex,
-      query,
-      hitIndex,
-    );
+    setRenderingPreviewPageIndex(hit.pageIndex);
+
+    let highlightedPage: RasterPage;
+
+    try {
+      highlightedPage = await renderHighlightedPreviewPage(
+        hit.pageIndex,
+        query,
+        hitIndex,
+      );
+    } finally {
+      setRenderingPreviewPageIndex((currentIndex) =>
+        currentIndex === hit.pageIndex ? null : currentIndex,
+      );
+    }
 
     setHighlightedPreviewPages((currentPages) => {
       const nextPages =
@@ -456,9 +466,9 @@ export function App({
     setActiveQuery(value);
     setActiveHitIndex(0);
     setActivePreviewHitIndex(0);
-    setMode('normal');
 
     if (renderHighlightedPreviewPage === undefined) {
+      setMode('normal');
       return;
     }
 
@@ -468,12 +478,13 @@ export function App({
     if (nextPreviewHits.length === 0) {
       setHighlightedPreviewPages(previewPages);
       setHighlightedPreviewPageIndexes(new Set());
+      setMode('normal');
       return;
     }
 
-    setHighlightedPreviewPages(previewPages);
     setHighlightedPreviewPageIndexes(new Set());
     await renderPreviewHit(0, value, nextPreviewHits, new Set());
+    setMode('normal');
   }
 
   function submitPageJump(value: string): void {

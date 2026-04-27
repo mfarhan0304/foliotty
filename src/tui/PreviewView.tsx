@@ -76,8 +76,18 @@ export function PreviewView({
       return;
     }
 
-    stdout.write(escape);
+    if (clear) {
+      stdout.write(escape);
+      lastRenderedPage.current = currentPage;
+      return;
+    }
+
+    const repaintTimer = setTimeout(() => {
+      stdout.write(escape);
+    }, 0);
     lastRenderedPage.current = currentPage;
+
+    return () => clearTimeout(repaintTimer);
   }, [capability, currentPage, repaintKey, stdout]);
 
   if (currentPage === undefined || !supportsInlinePreview(capability)) {

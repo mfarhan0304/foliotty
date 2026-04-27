@@ -22,7 +22,11 @@ function lastChromeFrame(result: { stdout: { frames: string[] } }): string {
       continue;
     }
 
-    if (frame.startsWith('[2J')) {
+    if (
+      frame.startsWith('[2J') ||
+      frame.includes('_Ga=T') ||
+      frame.includes(']1337;File=')
+    ) {
       continue;
     }
 
@@ -324,7 +328,7 @@ describe('App', () => {
     await tick(20);
 
     assert.equal(countInlinePreviewFrames(result), initialInlineFrameCount + 1);
-    assert.match(result.lastFrame() ?? '', /Enter submit/);
+    assert.match(lastChromeFrame(result), /Enter submit/);
   });
 
   test('searches preview mode with highlighted raster rendering', async () => {
@@ -372,6 +376,51 @@ describe('App', () => {
     const frame = lastChromeFrame(result);
     assert.match(frame, /preview/);
     assert.match(frame, /hit 1\/1/);
+  });
+
+  test('keeps current preview visible while search highlight renders', async () => {
+    let resolveHighlight: ((page: RasterPage) => void) | undefined;
+    const result = render(
+      <App
+        filename="resume.pdf"
+        graphicsCapability="kitty"
+        pages={[
+          {
+            lines: [createLine('Find me')],
+            links: [],
+          },
+        ]}
+        previewPages={[createRasterPage()]}
+        renderHighlightedPreviewPage={async () =>
+          new Promise<RasterPage>((resolve) => {
+            resolveHighlight = resolve;
+          })
+        }
+        textPages={[[createTextItem('Find me')]]}
+      />,
+    );
+
+    await tick(20);
+    result.stdin.write('/');
+    await tick(20);
+    const promptFrameCount = countInlinePreviewFrames(result);
+
+    result.stdin.write('Find');
+    await tick(20);
+    result.stdin.write('\r');
+    await tick(30);
+
+    assert.equal(countInlinePreviewFrames(result), promptFrameCount);
+    assert.match(lastChromeFrame(result), /Enter submit/);
+
+    resolveHighlight?.({
+      ...createRasterPage(),
+      png: Buffer.from('highlighted'),
+    });
+    await tick(40);
+
+    assert.ok(countInlinePreviewFrames(result) > promptFrameCount);
+    assert.match(lastChromeFrame(result), /hit 1\/1/);
   });
 
   test('moves between preview search hits with n and N', async () => {
