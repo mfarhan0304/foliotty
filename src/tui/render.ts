@@ -57,9 +57,17 @@ function overlap(
   };
 }
 
+function rangesEqual(
+  left: HighlightRange,
+  right: HighlightRange | null,
+): boolean {
+  return right !== null && left.start === right.start && left.end === right.end;
+}
+
 export function renderStyledLine(
   line: StyledLine,
   highlightRanges: HighlightRange[] = [],
+  activeHighlightRange: HighlightRange | null = null,
 ): string {
   if (line.kind === 'blank') {
     return '';
@@ -94,15 +102,18 @@ export function renderStyledLine(
         );
       }
 
-      rendered += chalk.bgYellow.black(
-        applyLineKind(
-          applyRunStyles(
-            run.text.slice(range.start - runStart, range.end - runStart),
-            run,
-          ),
-          line,
+      const styled = applyLineKind(
+        applyRunStyles(
+          run.text.slice(range.start - runStart, range.end - runStart),
+          run,
         ),
+        line,
       );
+      const isActive = rangesEqual(range, activeHighlightRange);
+
+      rendered += isActive
+        ? chalk.bgHex('#ffa500').black(styled)
+        : chalk.bgYellow.black(styled);
       cursor = range.end;
     }
 
@@ -124,6 +135,7 @@ export function renderStyledLineSlice(
   start: number,
   end: number,
   highlightRanges: HighlightRange[] = [],
+  activeHighlightRange: HighlightRange | null = null,
 ): string {
   if (line.kind === 'blank') {
     return '';
@@ -162,6 +174,17 @@ export function renderStyledLineSlice(
     }))
     .filter((range) => range.start < range.end);
 
+  const shiftedActive =
+    activeHighlightRange === null
+      ? null
+      : (() => {
+          const active = {
+            end: Math.min(end, activeHighlightRange.end) - start,
+            start: Math.max(start, activeHighlightRange.start) - start,
+          };
+          return active.start < active.end ? active : null;
+        })();
+
   return renderStyledLine(
     {
       ...line,
@@ -169,5 +192,6 @@ export function renderStyledLineSlice(
       text: line.text.slice(start, end),
     },
     shiftedRanges,
+    shiftedActive,
   );
 }

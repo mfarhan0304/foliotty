@@ -3,7 +3,7 @@ import type { TextItem } from './pdf-service.js';
 
 export type SearchHit = {
   lineIndex: number;
-  ranges: Array<{ end: number; start: number }>;
+  range: { end: number; start: number };
 };
 
 export type SearchIndex = {
@@ -164,10 +164,10 @@ export function searchIndexedLines(
 
     const ranges = rangesForLine(normalizedText, normalizedQuery);
 
-    if (ranges.length > 0) {
+    for (const range of ranges) {
       hits.push({
         lineIndex,
-        ranges,
+        range,
       });
     }
   }

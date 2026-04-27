@@ -13,11 +13,7 @@ import type { StyledLine } from '../core/structure.js';
 import { HelpOverlay } from './HelpOverlay.js';
 import { LinkOverlay } from './LinkOverlay.js';
 import type { GraphicsCapability } from './graphics.js';
-import {
-  countWrappedRows,
-  lineIndexAtRowOffset,
-  rowOffsetForLine,
-} from './layout.js';
+import { countWrappedRows, rowOffsetForLine } from './layout.js';
 import { openUrl as defaultOpenUrl } from './open-url.js';
 import type { OpenUrl } from './open-url.js';
 import { PreviewView, supportsInlinePreview } from './PreviewView.js';
@@ -196,6 +192,9 @@ export function App({
   const [pageScrollOffsets, setPageScrollOffsets] = useState<number[]>(
     displayPages.map(() => 0),
   );
+  const [pageCursorLines, setPageCursorLines] = useState<number[]>(
+    displayPages.map(() => 0),
+  );
   const [searchValue, setSearchValue] = useState('');
   const [pageValue, setPageValue] = useState('');
   const [activeQuery, setActiveQuery] = useState('');
@@ -223,23 +222,10 @@ export function App({
     currentPreviewPage === undefined ? [] : [currentPreviewPage];
   const currentPageStart = pageStarts[currentPageIndex] ?? 0;
   const currentPageScrollOffset = pageScrollOffsets[currentPageIndex] ?? 0;
+  const currentPageCursorLine = pageCursorLines[currentPageIndex] ?? 0;
   const currentPageNumber = currentPageIndex + 1;
   const pageCount = displayPages.length;
-  const currentHitPage =
-    currentHitLineIndex === null
-      ? null
-      : pageForLine(currentHitLineIndex, pageStarts);
-  const currentHitLocalLineIndex =
-    currentHitPage === currentPageNumber && currentHitLineIndex !== null
-      ? currentHitLineIndex - currentPageStart
-      : null;
-  const currentLine =
-    currentHitLocalLineIndex ??
-    lineIndexAtRowOffset(
-      currentPage.lines,
-      currentPageScrollOffset,
-      contentWidth,
-    );
+  const currentLine = currentPageCursorLine;
   const statusHitCount =
     displayMode === 'preview' && previewHits.length > 0
       ? previewHits.length
@@ -272,6 +258,24 @@ export function App({
 
       return offsets.map((offset, index) =>
         index === pageIndex ? target : offset,
+      );
+    });
+  }
+
+  function lastLineForPage(pageIndex: number): number {
+    return Math.max(0, (displayPages[pageIndex]?.lines.length ?? 1) - 1);
+  }
+
+  function updatePageCursor(pageIndex: number, nextLine: number): void {
+    setPageCursorLines((cursors) => {
+      const target = clamp(nextLine, 0, lastLineForPage(pageIndex));
+
+      if ((cursors[pageIndex] ?? 0) === target) {
+        return cursors;
+      }
+
+      return cursors.map((cursor, index) =>
+        index === pageIndex ? target : cursor,
       );
     });
   }
@@ -574,44 +578,100 @@ export function App({
     if (currentHitLineIndex !== null) {
       const pageIndex = pageForLine(currentHitLineIndex, pageStarts) - 1;
       const pageStart = pageStarts[pageIndex] ?? 0;
-      const targetScroll = rowOffsetForLine(
-        displayPages[pageIndex]?.lines ?? [],
-        currentHitLineIndex - pageStart,
-        contentWidth,
-      );
+      const localLine = currentHitLineIndex - pageStart;
 
       if (currentPageIndex !== pageIndex) {
         moveToPage(pageIndex);
       }
 
-      if ((pageScrollOffsets[pageIndex] ?? 0) !== targetScroll) {
-        updatePageScroll(pageIndex, targetScroll);
-      }
+      // Move the cursor to the active hit; the cursor-driven scroll effect
+      // below will scroll the viewport to keep the cursor visible.
+      updatePageCursor(pageIndex, localLine);
     }
   }, [
     contentWidth,
     currentHitLineIndex,
-    currentPageIndex,
     displayMode,
     displayPages,
-    pageScrollOffsets,
     pageStarts,
   ]);
 
-  const currentPageHitRanges = useMemo(
-    () =>
-      new Map(
-        hits
-          .filter(
-            (hit) =>
-              pageForLine(hit.lineIndex, pageStarts) === currentPageNumber,
-          )
-          .map(
-            (hit) => [hit.lineIndex - currentPageStart, hit.ranges] as const,
-          ),
-      ),
-    [currentPageNumber, currentPageStart, hits, pageStarts],
-  );
+  // Keep the cursor in the visible viewport: if it scrolls off the top, pull
+  // scroll up; if it scrolls past the bottom, pull scroll down. Only fires when
+  // the cursor or layout actually changes — the user's manual scroll (which we
+  // no longer drive directly via j/k) won't fight this loop because j/k now
+  // updates the cursor and lets this effect adjust scroll afterward.
+  useEffect(() => {
+    if (displayMode !== 'text') {
+      return;
+    }
+
+    const lines = displayPages[currentPageIndex]?.lines ?? [];
+    const cursorRow = rowOffsetForLine(
+      lines,
+      currentPageCursorLine,
+      contentWidth,
+    );
+    const maxScroll = maxScrollForPage(currentPageIndex);
+    const currentScroll = pageScrollOffsets[currentPageIndex] ?? 0;
+
+    let nextScroll = currentScroll;
+
+    if (cursorRow < currentScroll) {
+      nextScroll = cursorRow;
+    } else if (cursorRow >= currentScroll + visibleRowCount) {
+      nextScroll = cursorRow - visibleRowCount + 1;
+    }
+
+    nextScroll = clamp(nextScroll, 0, maxScroll);
+
+    if (nextScroll !== currentScroll) {
+      updatePageScroll(currentPageIndex, nextScroll);
+    }
+  }, [
+    contentWidth,
+    currentPageCursorLine,
+    currentPageIndex,
+    displayMode,
+    displayPages,
+    visibleRowCount,
+  ]);
+
+  const currentPageHitRanges = useMemo(() => {
+    const result = new Map<number, Array<{ end: number; start: number }>>();
+
+    for (const hit of hits) {
+      if (pageForLine(hit.lineIndex, pageStarts) !== currentPageNumber) {
+        continue;
+      }
+
+      const localLine = hit.lineIndex - currentPageStart;
+      const existing = result.get(localLine);
+
+      if (existing === undefined) {
+        result.set(localLine, [hit.range]);
+      } else {
+        existing.push(hit.range);
+      }
+    }
+
+    return result;
+  }, [currentPageNumber, currentPageStart, hits, pageStarts]);
+
+  const currentActiveHitRange = useMemo(() => {
+    if (currentHit === null) {
+      return null;
+    }
+
+    if (pageForLine(currentHit.lineIndex, pageStarts) !== currentPageNumber) {
+      return null;
+    }
+
+    return {
+      localLineIndex: currentHit.lineIndex - currentPageStart,
+      range: currentHit.range,
+    };
+  }, [currentHit, currentPageNumber, currentPageStart, pageStarts]);
 
   useInput((input, key) => {
     if (mode === 'search') {
@@ -705,12 +765,28 @@ export function App({
     }
 
     if (input === 'j') {
-      updatePageScroll(currentPageIndex, currentPageScrollOffset - 1);
+      if (currentPageCursorLine > 0) {
+        updatePageCursor(currentPageIndex, currentPageCursorLine - 1);
+      } else if (currentPageIndex > 0) {
+        // At the top of this page — flow into the previous page's last line.
+        const previousPageIndex = currentPageIndex - 1;
+        moveToPage(previousPageIndex);
+        updatePageCursor(previousPageIndex, lastLineForPage(previousPageIndex));
+      }
       return;
     }
 
     if (input === 'k') {
-      updatePageScroll(currentPageIndex, currentPageScrollOffset + 1);
+      const lastLine = lastLineForPage(currentPageIndex);
+
+      if (currentPageCursorLine < lastLine) {
+        updatePageCursor(currentPageIndex, currentPageCursorLine + 1);
+      } else if (currentPageIndex < pageCount - 1) {
+        // At the bottom of this page — flow into the next page's first line.
+        const nextPageIndex = currentPageIndex + 1;
+        moveToPage(nextPageIndex);
+        updatePageCursor(nextPageIndex, 0);
+      }
       return;
     }
 
@@ -764,6 +840,7 @@ export function App({
           />
         ) : (
           <ResumeView
+            activeHitRange={currentActiveHitRange}
             activeLineIndex={currentLine}
             contentWidth={contentWidth}
             hitRangesByLine={currentPageHitRanges}

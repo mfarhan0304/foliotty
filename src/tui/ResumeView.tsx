@@ -5,7 +5,13 @@ import type { StyledLine } from '../core/structure.js';
 import { wrapTextSegments } from './layout.js';
 import { renderStyledLineSlice } from './render.js';
 
+type ActiveHitRange = {
+  localLineIndex: number;
+  range: { end: number; start: number };
+};
+
 type ResumeViewProps = {
+  activeHitRange?: ActiveHitRange | null;
   activeLineIndex: number | null;
   contentWidth: number;
   hitRangesByLine: Map<number, Array<{ end: number; start: number }>>;
@@ -61,6 +67,7 @@ function getVisibleSegments(
 }
 
 export function ResumeView({
+  activeHitRange = null,
   activeLineIndex,
   contentWidth,
   hitRangesByLine,
@@ -79,10 +86,19 @@ export function ResumeView({
     <Box flexDirection="column">
       {segments.map((segment) => {
         const line = lines[segment.lineIndex];
+        // The orange highlight already pinpoints the active match in search
+        // mode, so the `>` cursor only renders when no search is active.
         const prefix =
-          activeLineIndex === segment.lineIndex && segment.isFirstRow
+          activeHitRange === null &&
+          activeLineIndex === segment.lineIndex &&
+          segment.isFirstRow
             ? '> '
             : '  ';
+        const activeRange =
+          activeHitRange !== null &&
+          activeHitRange.localLineIndex === segment.lineIndex
+            ? activeHitRange.range
+            : null;
 
         return (
           <Text
@@ -95,6 +111,7 @@ export function ResumeView({
                   segment.segmentStart,
                   segment.segmentEnd,
                   hitRangesByLine.get(segment.lineIndex) ?? [],
+                  activeRange,
                 )
               : ''}
           </Text>

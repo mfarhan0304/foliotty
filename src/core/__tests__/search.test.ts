@@ -57,11 +57,11 @@ describe('searchStyledLines', () => {
     assert.deepEqual(hits, [
       {
         lineIndex: 0,
-        ranges: [{ end: 6, start: 0 }],
+        range: { end: 6, start: 0 },
       },
       {
         lineIndex: 1,
-        ranges: [{ end: 37, start: 31 }],
+        range: { end: 37, start: 31 },
       },
     ]);
   });
@@ -75,7 +75,7 @@ describe('searchStyledLines', () => {
     assert.deepEqual(hits, [
       {
         lineIndex: 0,
-        ranges: [{ end: 4, start: 0 }],
+        range: { end: 4, start: 0 },
       },
     ]);
   });
@@ -112,7 +112,7 @@ describe('searchIndexedLines', () => {
     assert.deepEqual(searchIndexedLines(index, 'ai'), [
       {
         lineIndex: 0,
-        ranges: [{ end: 2, start: 0 }],
+        range: { end: 2, start: 0 },
       },
     ]);
   });
