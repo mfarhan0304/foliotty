@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Box, Text, useApp, useInput, useStdout } from 'ink';
 
 import type { PdfLink, TextItem } from '../core/pdf-service.js';
@@ -150,9 +150,10 @@ export function App({
   const visibleRowCount = Math.max(1, (stdout.rows ?? 24) - 4);
   const [highlightedPreviewPages, setHighlightedPreviewPages] =
     useState<RasterPage[]>(previewPages);
-  const [renderedPreviewPageIndexes, setRenderedPreviewPageIndexes] = useState<
-    Set<number>
-  >(() => new Set(previewPages.map((_, index) => index)));
+  const renderedPreviewPageIndexesRef = useRef<Set<number>>(
+    new Set(previewPages.map((_, index) => index)),
+  );
+  const previewRenderPromises = useRef<Map<number, Promise<void>>>(new Map());
   const [renderingPreviewPageIndex, setRenderingPreviewPageIndex] = useState<
     number | null
   >(null);
@@ -259,34 +260,73 @@ export function App({
     });
   }
 
-  async function ensurePreviewPage(pageIndex: number): Promise<void> {
+  function cachePreviewPage(pageIndex: number, page: RasterPage): void {
+    setHighlightedPreviewPages((currentPages) => {
+      const nextPages =
+        currentPages.length > 0 ? [...currentPages] : [...previewPages];
+      nextPages[pageIndex] = page;
+      return nextPages;
+    });
+    renderedPreviewPageIndexesRef.current = new Set([
+      ...renderedPreviewPageIndexesRef.current,
+      pageIndex,
+    ]);
+  }
+
+  async function renderPreviewPageIntoCache(
+    pageIndex: number,
+    showActivity: boolean,
+  ): Promise<void> {
     if (
       renderPreviewPage === undefined ||
-      renderedPreviewPageIndexes.has(pageIndex)
+      pageIndex < 0 ||
+      pageIndex >= pageCount ||
+      renderedPreviewPageIndexesRef.current.has(pageIndex)
     ) {
+      return;
+    }
+
+    const pendingRender = previewRenderPromises.current.get(pageIndex);
+
+    if (pendingRender !== undefined) {
+      if (showActivity) {
+        setRenderingPreviewPageIndex(pageIndex);
+        await pendingRender;
+        setRenderingPreviewPageIndex((currentIndex) =>
+          currentIndex === pageIndex ? null : currentIndex,
+        );
+      }
+
+      return;
+    }
+
+    const renderPromise = renderPreviewPage(pageIndex)
+      .then((renderedPage) => cachePreviewPage(pageIndex, renderedPage))
+      .finally(() => previewRenderPromises.current.delete(pageIndex));
+    previewRenderPromises.current.set(pageIndex, renderPromise);
+
+    if (!showActivity) {
+      void renderPromise;
       return;
     }
 
     setRenderingPreviewPageIndex(pageIndex);
 
     try {
-      const renderedPage = await renderPreviewPage(pageIndex);
-      setHighlightedPreviewPages((currentPages) => {
-        const nextPages =
-          currentPages.length > 0 ? [...currentPages] : [...previewPages];
-        nextPages[pageIndex] = renderedPage;
-        return nextPages;
-      });
-      setRenderedPreviewPageIndexes((currentIndexes) => {
-        const nextIndexes = new Set(currentIndexes);
-        nextIndexes.add(pageIndex);
-        return nextIndexes;
-      });
+      await renderPromise;
     } finally {
       setRenderingPreviewPageIndex((currentIndex) =>
         currentIndex === pageIndex ? null : currentIndex,
       );
     }
+  }
+
+  async function ensurePreviewPage(pageIndex: number): Promise<void> {
+    await renderPreviewPageIntoCache(pageIndex, true);
+  }
+
+  function prefetchPreviewPage(pageIndex: number): void {
+    void renderPreviewPageIntoCache(pageIndex, false);
   }
 
   function submitSearch(value: string): void {
@@ -330,11 +370,10 @@ export function App({
       nextPages[hit.pageIndex] = highlightedPage;
       return nextPages;
     });
-    setRenderedPreviewPageIndexes((currentIndexes) => {
-      const nextIndexes = new Set(currentIndexes);
-      nextIndexes.add(hit.pageIndex);
-      return nextIndexes;
-    });
+    renderedPreviewPageIndexesRef.current = new Set([
+      ...renderedPreviewPageIndexesRef.current,
+      hit.pageIndex,
+    ]);
     setHighlightedPreviewPageIndexes((currentIndexes) => {
       const nextIndexes = new Set(currentIndexes);
       nextIndexes.add(hit.pageIndex);
@@ -408,10 +447,12 @@ export function App({
   }, [displayMode, previewAvailable]);
 
   useEffect(() => {
-    setHighlightedPreviewPages(previewPages);
-    setRenderedPreviewPageIndexes(
-      new Set(previewPages.map((_, index) => index)),
+    const initialRenderedPageIndexes = new Set(
+      previewPages.map((_, index) => index),
     );
+    setHighlightedPreviewPages(previewPages);
+    renderedPreviewPageIndexesRef.current = initialRenderedPageIndexes;
+    previewRenderPromises.current.clear();
     setHighlightedPreviewPageIndexes(new Set());
     setActivePreviewHitIndex(0);
     setRenderingPreviewPageIndex(null);
@@ -421,6 +462,8 @@ export function App({
   useEffect(() => {
     if (displayMode === 'preview') {
       void ensurePreviewPage(currentPageIndex);
+      prefetchPreviewPage(currentPageIndex + 1);
+      prefetchPreviewPage(currentPageIndex - 1);
     }
   }, [currentPageIndex, displayMode]);
 
