@@ -216,6 +216,12 @@ export function App({
     displayMode === 'preview' && previewHits.length > 0
       ? previewHits.length
       : hits.length;
+  const activeHitOrdinal =
+    statusHitCount === 0
+      ? undefined
+      : displayMode === 'preview' && previewHits.length > 0
+        ? activePreviewHitIndex + 1
+        : activeHitIndex + 1;
   const previewActivity =
     displayMode === 'preview' && renderingPreviewPageIndex !== null
       ? `rendering page ${renderingPreviewPageIndex + 1}`
@@ -751,6 +757,7 @@ export function App({
       ) : (
         <StatusBar
           activity={previewActivity}
+          activeHitOrdinal={activeHitOrdinal}
           currentLine={currentLine}
           displayMode={displayMode}
           filename={filename}

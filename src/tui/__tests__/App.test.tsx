@@ -242,6 +242,7 @@ describe('App', () => {
 
     assert.deepEqual(renderedPages, [{ pageIndex: 0, query: 'Find' }]);
     assert.match(result.lastFrame() ?? '', /preview/);
+    assert.match(result.lastFrame() ?? '', /hit 1\/1/);
   });
 
   test('moves between preview search hits with n and N', async () => {
@@ -282,6 +283,7 @@ describe('App', () => {
 
     assert.deepEqual(renderedPages, [{ pageIndex: 0, query: 'Needle' }]);
     assert.match(result.lastFrame() ?? '', /page 1\/2/);
+    assert.match(result.lastFrame() ?? '', /hit 1\/2/);
 
     result.stdin.write('n');
     await tick(30);
@@ -291,6 +293,7 @@ describe('App', () => {
       { pageIndex: 1, query: 'Needle' },
     ]);
     assert.match(result.lastFrame() ?? '', /page 2\/2/);
+    assert.match(result.lastFrame() ?? '', /hit 2\/2/);
 
     result.stdin.write('N');
     await tick(30);
@@ -300,6 +303,7 @@ describe('App', () => {
       { pageIndex: 1, query: 'Needle' },
     ]);
     assert.match(result.lastFrame() ?? '', /page 1\/2/);
+    assert.match(result.lastFrame() ?? '', /hit 1\/2/);
   });
 
   test('turns pages with J for previous and K for next', async () => {

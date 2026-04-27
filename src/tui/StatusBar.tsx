@@ -3,6 +3,7 @@ import { Box, Text } from 'ink';
 
 type StatusBarProps = {
   activity?: string | undefined;
+  activeHitOrdinal?: number | undefined;
   currentLine: number;
   displayMode: 'preview' | 'text';
   filename: string;
@@ -15,6 +16,7 @@ type StatusBarProps = {
 
 export function StatusBar({
   activity,
+  activeHitOrdinal,
   currentLine,
   displayMode,
   filename,
@@ -24,12 +26,16 @@ export function StatusBar({
   pageCount,
   totalLines,
 }: StatusBarProps): React.JSX.Element {
+  const hitStatus =
+    activeHitOrdinal === undefined || hitCount === 0
+      ? `${hitCount} hit${hitCount === 1 ? '' : 's'}`
+      : `hit ${activeHitOrdinal}/${hitCount}`;
+
   return (
     <Box borderStyle="single" paddingX={1}>
       <Text>
         {filename} · line {Math.min(currentLine + 1, totalLines)}/{totalLines} ·
-        page {page}/{pageCount} · {displayMode} · {mode} · {hitCount} hit
-        {hitCount === 1 ? '' : 's'}
+        page {page}/{pageCount} · {displayMode} · {mode} · {hitStatus}
         {activity === undefined ? '' : ` · ${activity}`}
       </Text>
     </Box>
