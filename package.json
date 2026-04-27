@@ -16,6 +16,7 @@
   ],
   "scripts": {
     "build": "tsup",
+    "capture:preview": "bun run scripts/capture-preview-states.ts",
     "compare:samples": "bun run scripts/compare-samples.ts",
     "dev": "bun run src/cli.ts",
     "lint": "prettier --check . && tsc --noEmit",
