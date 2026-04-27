@@ -6,6 +6,8 @@ import type { GraphicsCapability } from './graphics.js';
 
 type PreviewViewProps = {
   capability: GraphicsCapability;
+  isRendering?: boolean;
+  pageNumber: number;
   pages: RasterPage[];
 };
 
@@ -41,25 +43,38 @@ export function renderInlinePreviewImage(
 
 export function PreviewView({
   capability,
+  isRendering = false,
+  pageNumber,
   pages,
 }: PreviewViewProps): React.JSX.Element {
   const images = pages
     .map((page) => renderInlinePreviewImage(page, capability))
     .filter((image): image is string => image !== null);
 
+  if (images.length === 0) {
+    return (
+      <Box alignItems="center" flexGrow={1} justifyContent="center">
+        {!supportsInlinePreview(capability) ? (
+          <Text dimColor>
+            Raster preview is unavailable in this terminal. Press t for text
+            mode.
+          </Text>
+        ) : isRendering ? (
+          <Text dimColor>Rendering page {pageNumber}...</Text>
+        ) : (
+          <Text dimColor>Page {pageNumber} is not rendered yet.</Text>
+        )}
+      </Box>
+    );
+  }
+
   return (
     <Box flexDirection="row">
-      {images.length > 0 ? (
-        images.map((image, index) => (
-          <Box key={index} marginRight={index < images.length - 1 ? 1 : 0}>
-            <Text>{image}</Text>
-          </Box>
-        ))
-      ) : (
-        <Text dimColor>
-          Raster preview is unavailable in this terminal. Press t for text mode.
-        </Text>
-      )}
+      {images.map((image, index) => (
+        <Box key={index} marginRight={index < images.length - 1 ? 1 : 0}>
+          <Text>{image}</Text>
+        </Box>
+      ))}
     </Box>
   );
 }

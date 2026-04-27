@@ -721,6 +721,8 @@ export function App({
         ) : displayMode === 'preview' ? (
           <PreviewView
             capability={graphicsCapability}
+            isRendering={renderingPreviewPageIndex === currentPageIndex}
+            pageNumber={currentPageNumber}
             pages={currentPreviewPages}
           />
         ) : (

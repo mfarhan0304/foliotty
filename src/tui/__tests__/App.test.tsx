@@ -157,6 +157,37 @@ describe('App', () => {
     assert.match(result.lastFrame() ?? '', /preview/);
   });
 
+  test('shows a rendering placeholder for uncached preview pages', async () => {
+    const result = render(
+      <App
+        filename="resume.pdf"
+        graphicsCapability="kitty"
+        pages={[
+          { lines: [createLine('Page One')], links: [] },
+          { lines: [createLine('Page Two')], links: [] },
+        ]}
+        previewPages={[{ ...createRasterPage(), pageNumber: 1 }]}
+        renderPreviewPage={() =>
+          new Promise((resolve) => {
+            setTimeout(
+              () =>
+                resolve({
+                  ...createRasterPage(),
+                  pageNumber: 2,
+                }),
+              60,
+            );
+          })
+        }
+      />,
+    );
+
+    result.stdin.write('K');
+    await tick(20);
+
+    assert.match(result.lastFrame() ?? '', /Rendering page 2/);
+  });
+
   test('prefetches the next preview page without duplicate renders', async () => {
     const renderedPages: number[] = [];
     const result = render(

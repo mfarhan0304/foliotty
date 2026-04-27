@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 
+import { render } from 'ink-testing-library';
+
 import {
+  PreviewView,
   renderInlinePreviewImage,
   supportsInlinePreview,
 } from '../PreviewView.js';
@@ -69,5 +72,23 @@ describe('renderInlinePreviewImage', () => {
 
   test('returns null when direct PNG preview is unsupported', () => {
     assert.equal(renderInlinePreviewImage(createRasterPage(), 'sixel'), null);
+  });
+});
+
+describe('PreviewView', () => {
+  test('shows a rendering placeholder for uncached preview pages', () => {
+    const result = render(
+      <PreviewView capability="kitty" isRendering pageNumber={3} pages={[]} />,
+    );
+
+    assert.match(result.lastFrame() ?? '', /Rendering page 3/);
+  });
+
+  test('shows a terminal fallback when inline preview is unsupported', () => {
+    const result = render(
+      <PreviewView capability="none" pageNumber={1} pages={[]} />,
+    );
+
+    assert.match(result.lastFrame() ?? '', /Raster preview is unavailable/);
   });
 });
