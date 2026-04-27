@@ -189,6 +189,64 @@ describe('App', () => {
     assert.match(result.lastFrame() ?? '', /preview/);
   });
 
+  test('moves between preview search hits with n and N', async () => {
+    const renderedPages: Array<{ pageIndex: number; query: string }> = [];
+    const result = render(
+      <App
+        filename="resume.pdf"
+        graphicsCapability="kitty"
+        pages={[
+          { lines: [createLine('Needle one')], links: [] },
+          { lines: [createLine('Needle two')], links: [] },
+        ]}
+        previewPages={[
+          { ...createRasterPage(), pageNumber: 1 },
+          { ...createRasterPage(), pageNumber: 2 },
+        ]}
+        renderHighlightedPreviewPage={async (pageIndex, query) => {
+          renderedPages.push({ pageIndex, query });
+          return {
+            ...createRasterPage(),
+            pageNumber: pageIndex + 1,
+            png: Buffer.from(`highlighted-${pageIndex}`),
+          };
+        }}
+        textPages={[
+          [createTextItem('Needle one')],
+          [createTextItem('Needle two')],
+        ]}
+      />,
+    );
+
+    result.stdin.write('/');
+    await tick(20);
+    result.stdin.write('Needle');
+    await tick(20);
+    result.stdin.write('\r');
+    await tick(30);
+
+    assert.deepEqual(renderedPages, [{ pageIndex: 0, query: 'Needle' }]);
+    assert.match(result.lastFrame() ?? '', /page 1\/2/);
+
+    result.stdin.write('n');
+    await tick(30);
+
+    assert.deepEqual(renderedPages, [
+      { pageIndex: 0, query: 'Needle' },
+      { pageIndex: 1, query: 'Needle' },
+    ]);
+    assert.match(result.lastFrame() ?? '', /page 2\/2/);
+
+    result.stdin.write('N');
+    await tick(30);
+
+    assert.deepEqual(renderedPages, [
+      { pageIndex: 0, query: 'Needle' },
+      { pageIndex: 1, query: 'Needle' },
+    ]);
+    assert.match(result.lastFrame() ?? '', /page 1\/2/);
+  });
+
   test('turns pages with J for previous and K for next', async () => {
     const result = render(
       <App

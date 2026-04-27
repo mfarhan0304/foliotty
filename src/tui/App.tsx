@@ -8,6 +8,7 @@ import {
   searchIndexedLines,
   searchTextItems,
 } from '../core/search.js';
+import type { PageSearchHit } from '../core/search.js';
 import type { StyledLine } from '../core/structure.js';
 import { HelpOverlay } from './HelpOverlay.js';
 import { LinkOverlay } from './LinkOverlay.js';
@@ -163,6 +164,10 @@ export function App({
   const [pageValue, setPageValue] = useState('');
   const [activeQuery, setActiveQuery] = useState('');
   const [activeHitIndex, setActiveHitIndex] = useState(0);
+  const [activePreviewHitIndex, setActivePreviewHitIndex] = useState(0);
+  const [previewHits, setPreviewHits] = useState<PageSearchHit[]>([]);
+  const [highlightedPreviewPageIndexes, setHighlightedPreviewPageIndexes] =
+    useState<Set<number>>(() => new Set());
   const [selectedLinkIndex, setSelectedLinkIndex] = useState(0);
   const [awaitingSecondG, setAwaitingSecondG] = useState(false);
 
@@ -198,6 +203,10 @@ export function App({
       currentPageScrollOffset,
       contentWidth,
     );
+  const statusHitCount =
+    displayMode === 'preview' && previewHits.length > 0
+      ? previewHits.length
+      : hits.length;
 
   function maxScrollForPage(pageIndex: number): number {
     return Math.max(
@@ -241,38 +250,84 @@ export function App({
   function submitSearch(value: string): void {
     setActiveQuery(value);
     setActiveHitIndex(0);
+    setActivePreviewHitIndex(0);
+    setPreviewHits([]);
     setMode('normal');
+  }
+
+  async function renderPreviewHit(
+    hitIndex: number,
+    query: string,
+    nextPreviewHits: PageSearchHit[] = previewHits,
+    cachedPageIndexes: Set<number> = highlightedPreviewPageIndexes,
+  ): Promise<void> {
+    if (renderHighlightedPreviewPage === undefined) {
+      return;
+    }
+
+    const hit = nextPreviewHits[hitIndex];
+
+    if (hit === undefined) {
+      return;
+    }
+
+    moveToPage(hit.pageIndex);
+
+    if (cachedPageIndexes.has(hit.pageIndex)) {
+      return;
+    }
+
+    const highlightedPage = await renderHighlightedPreviewPage(
+      hit.pageIndex,
+      query,
+    );
+
+    setHighlightedPreviewPages((currentPages) => {
+      const nextPages =
+        currentPages.length > 0 ? [...currentPages] : [...previewPages];
+      nextPages[hit.pageIndex] = highlightedPage;
+      return nextPages;
+    });
+    setHighlightedPreviewPageIndexes((currentIndexes) => {
+      const nextIndexes = new Set(currentIndexes);
+      nextIndexes.add(hit.pageIndex);
+      return nextIndexes;
+    });
+  }
+
+  async function movePreviewHit(delta: number): Promise<void> {
+    if (previewHits.length === 0) {
+      return;
+    }
+
+    const nextIndex =
+      (activePreviewHitIndex + delta + previewHits.length) % previewHits.length;
+    setActivePreviewHitIndex(nextIndex);
+    await renderPreviewHit(nextIndex, activeQuery);
   }
 
   async function submitPreviewSearch(value: string): Promise<void> {
     setActiveQuery(value);
     setActiveHitIndex(0);
+    setActivePreviewHitIndex(0);
     setMode('normal');
 
     if (renderHighlightedPreviewPage === undefined) {
       return;
     }
 
-    const [firstHit] = searchTextItems(textPages, value);
+    const nextPreviewHits = searchTextItems(textPages, value);
+    setPreviewHits(nextPreviewHits);
 
-    if (firstHit === undefined) {
+    if (nextPreviewHits.length === 0) {
       setHighlightedPreviewPages(previewPages);
+      setHighlightedPreviewPageIndexes(new Set());
       return;
     }
 
-    moveToPage(firstHit.pageIndex);
-
-    const highlightedPage = await renderHighlightedPreviewPage(
-      firstHit.pageIndex,
-      value,
-    );
-
-    setHighlightedPreviewPages((currentPages) => {
-      const nextPages =
-        currentPages.length > 0 ? [...currentPages] : [...previewPages];
-      nextPages[firstHit.pageIndex] = highlightedPage;
-      return nextPages;
-    });
+    setHighlightedPreviewPages(previewPages);
+    setHighlightedPreviewPageIndexes(new Set());
+    await renderPreviewHit(0, value, nextPreviewHits, new Set());
   }
 
   function submitPageJump(value: string): void {
@@ -307,6 +362,9 @@ export function App({
 
   useEffect(() => {
     setHighlightedPreviewPages(previewPages);
+    setHighlightedPreviewPageIndexes(new Set());
+    setActivePreviewHitIndex(0);
+    setPreviewHits([]);
   }, [previewPages]);
 
   useEffect(() => {
@@ -316,6 +374,10 @@ export function App({
   }, [currentPageLinks.length]);
 
   useEffect(() => {
+    if (displayMode === 'preview') {
+      return;
+    }
+
     if (currentHitLineIndex !== null) {
       const pageIndex = pageForLine(currentHitLineIndex, pageStarts) - 1;
       const pageStart = pageStarts[pageIndex] ?? 0;
@@ -337,6 +399,7 @@ export function App({
     contentWidth,
     currentHitLineIndex,
     currentPageIndex,
+    displayMode,
     displayPages,
     pageScrollOffsets,
     pageStarts,
@@ -484,6 +547,18 @@ export function App({
       return;
     }
 
+    if (input === 'n' && displayMode === 'preview' && previewHits.length > 0) {
+      void movePreviewHit(1);
+      setAwaitingSecondG(false);
+      return;
+    }
+
+    if (input === 'N' && displayMode === 'preview' && previewHits.length > 0) {
+      void movePreviewHit(-1);
+      setAwaitingSecondG(false);
+      return;
+    }
+
     if (input === 'n' && hits.length > 0) {
       setActiveHitIndex((value) => (value + 1) % hits.length);
       setAwaitingSecondG(false);
@@ -578,7 +653,7 @@ export function App({
           currentLine={currentLine}
           displayMode={displayMode}
           filename={filename}
-          hitCount={hits.length}
+          hitCount={statusHitCount}
           mode={mode}
           page={currentPageNumber}
           pageCount={pageCount}
