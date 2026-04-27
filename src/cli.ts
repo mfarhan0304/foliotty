@@ -153,6 +153,7 @@ try {
         renderPreviewPage,
         textPages: document.pages,
       }),
+      { incrementalRendering: true },
     );
 
     try {

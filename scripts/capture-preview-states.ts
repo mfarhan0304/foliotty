@@ -71,7 +71,23 @@ function harnessRender(tree: React.ReactElement): RenderResult {
   });
 
   return {
-    lastFrame: () => stdout.lastFrame ?? '',
+    lastFrame: () => {
+      for (let index = stdout.frames.length - 1; index >= 0; index -= 1) {
+        const frame = stdout.frames[index];
+
+        if (frame === undefined) {
+          continue;
+        }
+
+        if (frame.startsWith('[2J')) {
+          continue;
+        }
+
+        return frame;
+      }
+
+      return '';
+    },
     stdin,
     unmount: () => {
       instance.unmount();

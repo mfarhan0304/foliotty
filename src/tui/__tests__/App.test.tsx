@@ -12,6 +12,26 @@ function tick(delay = 0): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, delay));
 }
 
+function lastChromeFrame(result: { stdout: { frames: string[] } }): string {
+  const frames = result.stdout.frames;
+
+  for (let index = frames.length - 1; index >= 0; index -= 1) {
+    const frame = frames[index];
+
+    if (frame === undefined) {
+      continue;
+    }
+
+    if (frame.startsWith('[2J')) {
+      continue;
+    }
+
+    return frame;
+  }
+
+  return '';
+}
+
 function createLine(
   text: string,
   kind: StyledLine['kind'] = 'body',
@@ -100,7 +120,7 @@ describe('App', () => {
       />,
     );
 
-    const frame = result.lastFrame() ?? '';
+    const frame = lastChromeFrame(result);
     assert.match(frame, /preview/);
     assert.doesNotMatch(frame, /Text Mode/);
   });
@@ -123,12 +143,12 @@ describe('App', () => {
       />,
     );
 
-    assert.match(result.lastFrame() ?? '', /page 1\/3/);
+    assert.match(lastChromeFrame(result), /page 1\/3/);
 
     result.stdin.write('K');
     await tick(20);
 
-    assert.match(result.lastFrame() ?? '', /page 2\/3/);
+    assert.match(lastChromeFrame(result), /page 2\/3/);
   });
 
   test('renders preview pages lazily when navigating', async () => {
@@ -153,8 +173,9 @@ describe('App', () => {
     await tick(40);
 
     assert.deepEqual(renderedPages, [1]);
-    assert.match(result.lastFrame() ?? '', /page 2\/2/);
-    assert.match(result.lastFrame() ?? '', /preview/);
+    const frame = lastChromeFrame(result);
+    assert.match(frame, /page 2\/2/);
+    assert.match(frame, /preview/);
   });
 
   test('shows a rendering placeholder for uncached preview pages', async () => {
@@ -249,7 +270,7 @@ describe('App', () => {
     await tick(40);
 
     assert.ok(renderedPages.filter((pageIndex) => pageIndex === 0).length >= 1);
-    assert.match(result.lastFrame() ?? '', /page 1\/12/);
+    assert.match(lastChromeFrame(result), /page 1\/12/);
   });
 
   test('toggles from preview mode to text mode', async () => {
@@ -317,8 +338,9 @@ describe('App', () => {
     assert.deepEqual(renderedPages, [
       { activeHitIndex: 0, pageIndex: 0, query: 'Find' },
     ]);
-    assert.match(result.lastFrame() ?? '', /preview/);
-    assert.match(result.lastFrame() ?? '', /hit 1\/1/);
+    const frame = lastChromeFrame(result);
+    assert.match(frame, /preview/);
+    assert.match(frame, /hit 1\/1/);
   });
 
   test('moves between preview search hits with n and N', async () => {
@@ -368,8 +390,9 @@ describe('App', () => {
     assert.deepEqual(renderedPages, [
       { activeHitIndex: 0, pageIndex: 0, query: 'Needle' },
     ]);
-    assert.match(result.lastFrame() ?? '', /page 1\/2/);
-    assert.match(result.lastFrame() ?? '', /hit 1\/2/);
+    let frame = lastChromeFrame(result);
+    assert.match(frame, /page 1\/2/);
+    assert.match(frame, /hit 1\/2/);
 
     result.stdin.write('n');
     await tick(30);
@@ -378,8 +401,9 @@ describe('App', () => {
       { activeHitIndex: 0, pageIndex: 0, query: 'Needle' },
       { activeHitIndex: 1, pageIndex: 1, query: 'Needle' },
     ]);
-    assert.match(result.lastFrame() ?? '', /page 2\/2/);
-    assert.match(result.lastFrame() ?? '', /hit 2\/2/);
+    frame = lastChromeFrame(result);
+    assert.match(frame, /page 2\/2/);
+    assert.match(frame, /hit 2\/2/);
 
     result.stdin.write('N');
     await tick(30);
@@ -388,8 +412,9 @@ describe('App', () => {
       { activeHitIndex: 0, pageIndex: 0, query: 'Needle' },
       { activeHitIndex: 1, pageIndex: 1, query: 'Needle' },
     ]);
-    assert.match(result.lastFrame() ?? '', /page 1\/2/);
-    assert.match(result.lastFrame() ?? '', /hit 1\/2/);
+    frame = lastChromeFrame(result);
+    assert.match(frame, /page 1\/2/);
+    assert.match(frame, /hit 1\/2/);
   });
 
   test('turns pages with J for previous and K for next', async () => {

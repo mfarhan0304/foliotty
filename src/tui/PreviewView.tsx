@@ -1,5 +1,5 @@
-import React from 'react';
-import { Box, Text } from 'ink';
+import React, { useEffect } from 'react';
+import { Box, Text, useStdout } from 'ink';
 
 import type { RasterPage } from '../core/raster.js';
 import type { GraphicsCapability } from './graphics.js';
@@ -35,10 +35,10 @@ export function renderInlinePreviewImage(
         ? ''
         : `,c=${page.displayColumns},r=${page.displayRows}`;
 
-    return `\u001B[2J\u001B[3J\u001B[H\u001B_Ga=d,d=A\u001B\\\u001B_Ga=T,f=100${placement};${payload}\u001B\\`;
+    return `[2J[3J[H_Ga=d,d=A\\_Ga=T,f=100${placement};${payload}\\`;
   }
 
-  return `\u001B[2J\u001B[3J\u001B[H\u001B]1337;File=inline=1;width=${displayWidth}px;height=${displayHeight}px:${payload}\u0007`;
+  return `[2J[3J[H]1337;File=inline=1;width=${displayWidth}px;height=${displayHeight}px:${payload}`;
 }
 
 export function PreviewView({
@@ -47,11 +47,25 @@ export function PreviewView({
   pageNumber,
   pages,
 }: PreviewViewProps): React.JSX.Element {
-  const images = pages
-    .map((page) => renderInlinePreviewImage(page, capability))
-    .filter((image): image is string => image !== null);
+  const { stdout } = useStdout();
+  const currentPage = pages[0];
+  const reservedRows = currentPage?.displayRows ?? 0;
 
-  if (images.length === 0) {
+  useEffect(() => {
+    if (currentPage === undefined) {
+      return;
+    }
+
+    const escape = renderInlinePreviewImage(currentPage, capability);
+
+    if (escape === null) {
+      return;
+    }
+
+    stdout.write(escape);
+  }, [capability, currentPage, stdout]);
+
+  if (currentPage === undefined || !supportsInlinePreview(capability)) {
     return (
       <Box alignItems="center" flexGrow={1} justifyContent="center">
         {!supportsInlinePreview(capability) ? (
@@ -68,13 +82,5 @@ export function PreviewView({
     );
   }
 
-  return (
-    <Box flexDirection="row">
-      {images.map((image, index) => (
-        <Box key={index} marginRight={index < images.length - 1 ? 1 : 0}>
-          <Text>{image}</Text>
-        </Box>
-      ))}
-    </Box>
-  );
+  return <Box flexGrow={1} height={reservedRows} />;
 }
