@@ -40,6 +40,7 @@ type AppProps = {
     pageIndex: number,
     query: string,
   ) => Promise<RasterPage>;
+  renderPreviewPage?: (pageIndex: number) => Promise<RasterPage>;
   textPages?: TextItem[][];
 };
 
@@ -136,6 +137,7 @@ export function App({
   pages,
   previewPages = EMPTY_RASTER_PAGES,
   renderHighlightedPreviewPage,
+  renderPreviewPage,
   textPages = EMPTY_TEXT_PAGES,
 }: AppProps): React.JSX.Element {
   const { exit } = useApp();
@@ -148,10 +150,17 @@ export function App({
   const visibleRowCount = Math.max(1, (stdout.rows ?? 24) - 4);
   const [highlightedPreviewPages, setHighlightedPreviewPages] =
     useState<RasterPage[]>(previewPages);
+  const [renderedPreviewPageIndexes, setRenderedPreviewPageIndexes] = useState<
+    Set<number>
+  >(() => new Set(previewPages.map((_, index) => index)));
+  const [renderingPreviewPageIndex, setRenderingPreviewPageIndex] = useState<
+    number | null
+  >(null);
   const activePreviewPages =
     highlightedPreviewPages.length > 0 ? highlightedPreviewPages : previewPages;
   const previewAvailable =
-    activePreviewPages.length > 0 && supportsInlinePreview(graphicsCapability);
+    supportsInlinePreview(graphicsCapability) &&
+    (activePreviewPages.length > 0 || renderPreviewPage !== undefined);
   const [displayMode, setDisplayMode] = useState<DisplayMode>(
     previewAvailable ? 'preview' : 'text',
   );
@@ -180,10 +189,9 @@ export function App({
   const currentHitLineIndex = currentHit?.lineIndex ?? null;
   const currentPage = displayPages[currentPageIndex] ?? { lines: [] };
   const currentPageLinks = pages[currentPageIndex]?.links ?? [];
-  const currentPreviewPages = activePreviewPages.slice(
-    currentPageIndex,
-    currentPageIndex + 1,
-  );
+  const currentPreviewPage = activePreviewPages[currentPageIndex];
+  const currentPreviewPages =
+    currentPreviewPage === undefined ? [] : [currentPreviewPage];
   const currentPageStart = pageStarts[currentPageIndex] ?? 0;
   const currentPageScrollOffset = pageScrollOffsets[currentPageIndex] ?? 0;
   const currentPageNumber = currentPageIndex + 1;
@@ -207,6 +215,10 @@ export function App({
     displayMode === 'preview' && previewHits.length > 0
       ? previewHits.length
       : hits.length;
+  const previewActivity =
+    displayMode === 'preview' && renderingPreviewPageIndex !== null
+      ? `rendering page ${renderingPreviewPageIndex + 1}`
+      : undefined;
 
   function maxScrollForPage(pageIndex: number): number {
     return Math.max(
@@ -245,6 +257,36 @@ export function App({
 
       return clamp(current + delta, 0, currentPageLinks.length - 1);
     });
+  }
+
+  async function ensurePreviewPage(pageIndex: number): Promise<void> {
+    if (
+      renderPreviewPage === undefined ||
+      renderedPreviewPageIndexes.has(pageIndex)
+    ) {
+      return;
+    }
+
+    setRenderingPreviewPageIndex(pageIndex);
+
+    try {
+      const renderedPage = await renderPreviewPage(pageIndex);
+      setHighlightedPreviewPages((currentPages) => {
+        const nextPages =
+          currentPages.length > 0 ? [...currentPages] : [...previewPages];
+        nextPages[pageIndex] = renderedPage;
+        return nextPages;
+      });
+      setRenderedPreviewPageIndexes((currentIndexes) => {
+        const nextIndexes = new Set(currentIndexes);
+        nextIndexes.add(pageIndex);
+        return nextIndexes;
+      });
+    } finally {
+      setRenderingPreviewPageIndex((currentIndex) =>
+        currentIndex === pageIndex ? null : currentIndex,
+      );
+    }
   }
 
   function submitSearch(value: string): void {
@@ -287,6 +329,11 @@ export function App({
         currentPages.length > 0 ? [...currentPages] : [...previewPages];
       nextPages[hit.pageIndex] = highlightedPage;
       return nextPages;
+    });
+    setRenderedPreviewPageIndexes((currentIndexes) => {
+      const nextIndexes = new Set(currentIndexes);
+      nextIndexes.add(hit.pageIndex);
+      return nextIndexes;
     });
     setHighlightedPreviewPageIndexes((currentIndexes) => {
       const nextIndexes = new Set(currentIndexes);
@@ -362,10 +409,20 @@ export function App({
 
   useEffect(() => {
     setHighlightedPreviewPages(previewPages);
+    setRenderedPreviewPageIndexes(
+      new Set(previewPages.map((_, index) => index)),
+    );
     setHighlightedPreviewPageIndexes(new Set());
     setActivePreviewHitIndex(0);
+    setRenderingPreviewPageIndex(null);
     setPreviewHits([]);
   }, [previewPages]);
+
+  useEffect(() => {
+    if (displayMode === 'preview') {
+      void ensurePreviewPage(currentPageIndex);
+    }
+  }, [currentPageIndex, displayMode]);
 
   useEffect(() => {
     setSelectedLinkIndex((current) =>
@@ -650,6 +707,7 @@ export function App({
         />
       ) : (
         <StatusBar
+          activity={previewActivity}
           currentLine={currentLine}
           displayMode={displayMode}
           filename={filename}

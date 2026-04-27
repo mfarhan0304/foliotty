@@ -114,25 +114,25 @@ try {
         pageNumber: pageIndex + 1,
         width: previewFit.renderWidth,
       });
+    const renderPreviewPage = (pageIndex: number) =>
+      renderPdfPageToPng(filePath, {
+        displayColumns: previewFit.displayColumns,
+        displayHeight: previewFit.displayHeight,
+        displayRows: previewFit.displayRows,
+        displayWidth: previewFit.displayWidth,
+        pageNumber: pageIndex + 1,
+        width: previewFit.renderWidth,
+      });
     const previewPages = supportsInlinePreview(graphicsCapability)
-      ? await Promise.all(
-          Array.from({ length: document.numPages }, (_, index) =>
-            renderPdfPageToPng(filePath, {
-              displayColumns: previewFit.displayColumns,
-              displayHeight: previewFit.displayHeight,
-              displayRows: previewFit.displayRows,
-              displayWidth: previewFit.displayWidth,
-              pageNumber: index + 1,
-              width: previewFit.renderWidth,
-            }),
-          ),
-        ).catch((error: unknown) => {
-          if (error instanceof RasterBackendUnavailableError) {
-            return [];
-          }
+      ? await renderPreviewPage(0)
+          .then((page) => [page])
+          .catch((error: unknown) => {
+            if (error instanceof RasterBackendUnavailableError) {
+              return [];
+            }
 
-          throw error;
-        })
+            throw error;
+          })
       : [];
 
     process.stdout.write('\u001B[?1049h\u001B[2J\u001B[3J\u001B[H');
@@ -144,6 +144,7 @@ try {
         pages,
         previewPages,
         renderHighlightedPreviewPage,
+        renderPreviewPage,
         textPages: document.pages,
       }),
     );

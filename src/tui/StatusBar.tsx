@@ -2,6 +2,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 
 type StatusBarProps = {
+  activity?: string | undefined;
   currentLine: number;
   displayMode: 'preview' | 'text';
   filename: string;
@@ -13,6 +14,7 @@ type StatusBarProps = {
 };
 
 export function StatusBar({
+  activity,
   currentLine,
   displayMode,
   filename,
@@ -28,6 +30,7 @@ export function StatusBar({
         {filename} · line {Math.min(currentLine + 1, totalLines)}/{totalLines} ·
         page {page}/{pageCount} · {displayMode} · {mode} · {hitCount} hit
         {hitCount === 1 ? '' : 's'}
+        {activity === undefined ? '' : ` · ${activity}`}
       </Text>
     </Box>
   );

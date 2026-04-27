@@ -131,6 +131,32 @@ describe('App', () => {
     assert.match(result.lastFrame() ?? '', /page 2\/3/);
   });
 
+  test('renders preview pages lazily when navigating', async () => {
+    const renderedPages: number[] = [];
+    const result = render(
+      <App
+        filename="resume.pdf"
+        graphicsCapability="kitty"
+        pages={[
+          { lines: [createLine('Page One')], links: [] },
+          { lines: [createLine('Page Two')], links: [] },
+        ]}
+        previewPages={[{ ...createRasterPage(), pageNumber: 1 }]}
+        renderPreviewPage={async (pageIndex) => {
+          renderedPages.push(pageIndex);
+          return { ...createRasterPage(), pageNumber: pageIndex + 1 };
+        }}
+      />,
+    );
+
+    result.stdin.write('K');
+    await tick(40);
+
+    assert.deepEqual(renderedPages, [1]);
+    assert.match(result.lastFrame() ?? '', /page 2\/2/);
+    assert.match(result.lastFrame() ?? '', /preview/);
+  });
+
   test('toggles from preview mode to text mode', async () => {
     const result = render(
       <App
