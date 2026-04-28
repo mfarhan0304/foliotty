@@ -40,4 +40,31 @@ describe('detectGraphicsCapability', () => {
   test('returns none when no graphics protocol is detected', () => {
     assert.equal(detectGraphicsCapability({ TERM: 'xterm-256color' }), 'none');
   });
+
+  test('FOLIOTTY_GRAPHICS overrides detection', () => {
+    assert.equal(
+      detectGraphicsCapability({
+        FOLIOTTY_GRAPHICS: 'iterm',
+        TERM: 'xterm-256color',
+      }),
+      'iterm',
+    );
+    assert.equal(
+      detectGraphicsCapability({
+        FOLIOTTY_GRAPHICS: 'kitty',
+        TERM_PROGRAM: 'iTerm.app',
+      }),
+      'kitty',
+    );
+  });
+
+  test('FOLIOTTY_GRAPHICS ignores unknown values', () => {
+    assert.equal(
+      detectGraphicsCapability({
+        FOLIOTTY_GRAPHICS: 'bogus',
+        TERM_PROGRAM: 'iTerm.app',
+      }),
+      'iterm',
+    );
+  });
 });
