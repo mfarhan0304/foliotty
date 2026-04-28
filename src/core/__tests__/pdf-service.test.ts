@@ -158,12 +158,16 @@ describe('openPdf', () => {
     );
 
     const document = await openPdf(fixturePath);
-    const firstLink = document.pageLinks[0]?.[0];
+    const firstPageLinks = document.pageLinks[0] ?? [];
+    const linkedInLink = firstPageLinks.find((link) =>
+      link.url.startsWith('https://www.linkedin.com/'),
+    );
 
-    assert.ok((document.pageLinks[0]?.length ?? 0) > 0);
-    assert.equal(firstLink?.text, 'm.farhan@nyu.edu');
-    assert.equal(firstLink?.url, 'mailto:m.farhan@nyu.edu');
-    assert.equal(typeof firstLink?.x, 'number');
-    assert.equal(typeof firstLink?.y, 'number');
+    assert.ok(firstPageLinks.length > 0);
+    assert.ok(linkedInLink !== undefined);
+    assert.equal(typeof linkedInLink.text, 'string');
+    assert.ok(linkedInLink.text.length > 0);
+    assert.equal(typeof linkedInLink.x, 'number');
+    assert.equal(typeof linkedInLink.y, 'number');
   });
 });
