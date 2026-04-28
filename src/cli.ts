@@ -43,7 +43,7 @@ type PreviewFit = {
 const PDF_PAGE_ASPECT_RATIO = 8.5 / 11;
 const PREVIEW_CELL_HEIGHT = 24;
 const PREVIEW_CELL_WIDTH = 10;
-const PREVIEW_RENDER_SCALE = 2;
+const PREVIEW_RENDER_SCALE = 1;
 
 function fitPreviewToTerminal(columns = 80, rows = 24): PreviewFit {
   // Chrome below the preview is two rows: a single-line status bar plus a
