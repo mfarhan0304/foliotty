@@ -14,7 +14,7 @@ export function HelpOverlay(): React.JSX.Element {
 
       <Text bold> </Text>
       <Text bold>Read</Text>
-      <Text> j / k previous or next line</Text>
+      <Text> j / k previous or next line (text mode)</Text>
       <Text> J / K previous or next page</Text>
       <Text> p go to page</Text>
       <Text> t toggle preview or text mode</Text>

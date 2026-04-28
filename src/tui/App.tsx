@@ -764,7 +764,7 @@ export function App({
       return;
     }
 
-    if (input === 'j') {
+    if (input === 'j' && displayMode === 'text') {
       if (currentPageCursorLine > 0) {
         updatePageCursor(currentPageIndex, currentPageCursorLine - 1);
       } else if (currentPageIndex > 0) {
@@ -776,7 +776,7 @@ export function App({
       return;
     }
 
-    if (input === 'k') {
+    if (input === 'k' && displayMode === 'text') {
       const lastLine = lastLineForPage(currentPageIndex);
 
       if (currentPageCursorLine < lastLine) {
