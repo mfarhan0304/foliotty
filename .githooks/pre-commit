@@ -1,0 +1,16 @@
+#!/usr/bin/env sh
+set -e
+
+if ! command -v bun >/dev/null 2>&1; then
+  echo "pre-commit: bun is not installed; skipping checks." >&2
+  exit 0
+fi
+
+echo "pre-commit: lint"
+bun run lint
+
+echo "pre-commit: test"
+bun test
+
+echo "pre-commit: build"
+bun run build
