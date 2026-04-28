@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useReducer, useRef } from 'react';
 import { Box, Text, useStdout } from 'ink';
 
 import type { RasterPage } from '../core/raster.js';
@@ -15,6 +15,20 @@ type RenderInlinePreviewImageOptions = {
   clear?: boolean;
   originColumn?: number;
 };
+
+export function clearInlinePreviewImage(
+  capability: GraphicsCapability,
+): string | null {
+  if (capability === 'kitty') {
+    return '\x1b_Ga=d,d=A\x1b\\';
+  }
+
+  if (capability === 'iterm') {
+    return '\x1b[2J\x1b[H';
+  }
+
+  return null;
+}
 
 export function supportsInlinePreview(
   capability: GraphicsCapability,
@@ -72,6 +86,28 @@ export function PreviewView({
   const currentPage = pages[0];
   const reservedRows = currentPage?.displayRows ?? 0;
   const lastRenderedPage = useRef<RasterPage | null>(null);
+  const [, forceRender] = useReducer((value: number) => value + 1, 0);
+
+  // When transitioning from a rendered page to the placeholder (loading or
+  // unrendered), the previous image still occupies the cells because it was
+  // emitted out of band via stdout.write — ink's diff doesn't know about it.
+  // Wipe it explicitly and force one more ink render so the centered loader
+  // text is repainted on top of the cleared cells.
+  useEffect(() => {
+    if (currentPage !== undefined || lastRenderedPage.current === null) {
+      return;
+    }
+
+    const escape = clearInlinePreviewImage(capability);
+    if (escape === null) {
+      return;
+    }
+
+    stdout.write(escape);
+    lastRenderedPage.current = null;
+    const timer = setTimeout(forceRender, 0);
+    return () => clearTimeout(timer);
+  });
 
   // Re-emit on every render. Standard log-update writes eraseLines+content
   // each render which wipes the image cells, so we need to redraw after every
